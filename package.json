@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev index.ts"
+    "dev": "ts-node-dev index.ts",
+    "clear": "ts-node-dev clear.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,8 +24,5 @@
     "change-case": "^4.1.2",
     "fs-extra": "^9.1.0",
     "pluralize": "^8.0.0"
-  },
-  "bin": {
-    "prisma-json-schema-generator": "dist/cli.js"
   }
 }
