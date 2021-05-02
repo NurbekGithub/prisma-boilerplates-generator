@@ -11,11 +11,13 @@ export function file(params: serviceParams) {
   const modelNamePlural = pluralize(NAME);
   return `
 import { Prisma, ${NAME} } from "@prisma/client";
+import { FastifyPluginAsync } from "fastify";
 import { db } from "../../db";
 
 declare module "fastify" {
   interface FastifyInstance {
     get${modelNamePlural}: () => Promise<{${modelNamePlural}: ${NAME}[]}>;
+    get${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;
     create${NAME}: (data: Prisma.${NAME}CreateInput) => Promise<{${NAME}: ${NAME}}>;
     update${NAME}: (
       data: Prisma.${NAME}UpdateInput,
@@ -25,10 +27,15 @@ declare module "fastify" {
   }
 }
 
-export async function ${SERVICE_NAME} (fastify, opts) {
+export const ${SERVICE_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
   async function get${modelNamePlural}() {
     const ${modelNamePlural} = await db.${NAME}.findMany();
     return { ${modelNamePlural} }
+  }
+
+  async function get${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
+    const ${NAME} = await db.${NAME}.findUnique({ where });
+    return { ${NAME} }
   }
 
   async function create${NAME}(data: Prisma.${NAME}CreateInput) {
@@ -47,9 +54,10 @@ export async function ${SERVICE_NAME} (fastify, opts) {
   }
 
   fastify.decorate("get${modelNamePlural}", get${modelNamePlural})
+  fastify.decorate("get${NAME}", get${NAME})
   fastify.decorate("create${NAME}", create${NAME})
   fastify.decorate("update${NAME}", update${NAME})
   fastify.decorate("delete${NAME}", delete${NAME})
 }
-  `;
+`;
 }

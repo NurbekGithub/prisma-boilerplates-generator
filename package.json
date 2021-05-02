@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev index.ts",
+    "dev": "npm run clear && ts-node-dev index.ts",
     "clear": "ts-node-dev clear.ts"
   },
   "keywords": [],
