@@ -1,0 +1,544 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator jsonSchema {
+  provider = "prisma-json-schema-generator"
+}
+
+model conclusion {
+  id                   BigInt              @id @default(autoincrement())
+  conclusion_timestamp DateTime?           @db.Timestamptz(6)
+  description_id       BigInt?
+  user_id              String?             @db.VarChar(100)
+  research_id          BigInt?
+  is_left_eye          Boolean?
+  description          description?        @relation(fields: [description_id], references: [id])
+  research             research?           @relation(fields: [research_id], references: [id])
+  conclusion_result    conclusion_result[]
+
+  @@unique([research_id, is_left_eye], name: "conclusion_research_id_is_left_eye_key")
+}
+
+model conclusion_auto {
+  id                         BigInt               @id @default(autoincrement())
+  timestamp                  DateTime?            @db.Timestamptz(6)
+  conclusion_result_codename String?              @db.VarChar(255)
+  research_id                BigInt?
+  is_left_eye                Boolean?
+  d_conclusion_result        d_conclusion_result? @relation(fields: [conclusion_result_codename], references: [codename])
+  research                   research?            @relation(fields: [research_id], references: [id])
+}
+
+model conclusion_result {
+  id                                BigInt                              @id @default(autoincrement())
+  result_main_codename              String?                             @db.VarChar(255)
+  conclusion_id                     BigInt?
+  text                              String?                             @db.VarChar(1000)
+  other                             String?                             @db.VarChar(1000)
+  conclusion                        conclusion?                         @relation(fields: [conclusion_id], references: [id])
+  d_result_main                     d_result_main?                      @relation(fields: [result_main_codename], references: [codename])
+  conclusion_result_to_degeneration conclusion_result_to_degeneration[]
+  conclusion_result_to_hypertonic   conclusion_result_to_hypertonic[]
+  conclusion_result_to_retinopathy  conclusion_result_to_retinopathy[]
+}
+
+model conclusion_result_to_degeneration {
+  conclusion_result_id  BigInt
+  degeneration_codename String                @db.VarChar(255)
+  id                    Int                   @id @default(autoincrement())
+  conclusion_result     conclusion_result     @relation(fields: [conclusion_result_id], references: [id])
+  d_result_degeneration d_result_degeneration @relation(fields: [degeneration_codename], references: [codename])
+}
+
+model conclusion_result_to_hypertonic {
+  conclusion_result_id BigInt
+  hypertonic_codename  String              @db.VarChar(255)
+  id                   Int                 @id @default(autoincrement())
+  conclusion_result    conclusion_result   @relation(fields: [conclusion_result_id], references: [id])
+  d_result_hypertonic  d_result_hypertonic @relation(fields: [hypertonic_codename], references: [codename])
+}
+
+model conclusion_result_to_retinopathy {
+  conclusion_result_id BigInt
+  retinopathy_codename String               @db.VarChar(255)
+  id                   Int                  @id @default(autoincrement())
+  conclusion_result    conclusion_result    @relation(fields: [conclusion_result_id], references: [id])
+  d_result_retinopathy d_result_retinopathy @relation(fields: [retinopathy_codename], references: [codename])
+}
+
+model d_artery {
+  codename              String                  @id @db.VarChar(255)
+  name_ru               String?                 @default("") @db.VarChar(255)
+  name_kz               String?                 @default("") @db.VarChar(255)
+  name_en               String?                 @default("") @db.VarChar(255)
+  order                 BigInt                  @default(autoincrement())
+  hide                  Boolean?                @default(false)
+  description_to_artery description_to_artery[]
+}
+
+model d_border {
+  codename    String        @id @db.VarChar(255)
+  name_ru     String?       @default("") @db.VarChar(255)
+  name_kz     String?       @default("") @db.VarChar(255)
+  name_en     String?       @default("") @db.VarChar(255)
+  order       BigInt        @default(autoincrement())
+  hide        Boolean?      @default(false)
+  description description[]
+}
+
+model d_conclusion_result {
+  codename        String            @id @db.VarChar(255)
+  name_ru         String?           @db.VarChar(255)
+  name_kz         String?           @db.VarChar(255)
+  name_en         String?           @default("") @db.VarChar(255)
+  order           BigInt            @default(autoincrement())
+  hide            Boolean?          @default(false)
+  conclusion_auto conclusion_auto[]
+}
+
+model d_description_main {
+  codename String   @id @db.VarChar(255)
+  name_ru  String?  @db.VarChar(255)
+  name_kz  String?  @default("") @db.VarChar(255)
+  name_en  String?  @default("") @db.VarChar(255)
+  order    BigInt   @default(autoincrement())
+  hide     Boolean? @default(false)
+}
+
+model d_disk {
+  codename    String        @id @db.VarChar(255)
+  name_ru     String?       @default("") @db.VarChar(255)
+  name_kz     String?       @default("") @db.VarChar(255)
+  name_en     String?       @default("") @db.VarChar(255)
+  order       BigInt        @default(autoincrement())
+  hide        Boolean?      @default(false)
+  description description[]
+}
+
+model d_fossa {
+  codename    String        @id @db.VarChar(255)
+  name_ru     String?       @default("") @db.VarChar(255)
+  name_kz     String?       @default("") @db.VarChar(255)
+  name_en     String?       @default("") @db.VarChar(255)
+  order       BigInt        @default(autoincrement())
+  hide        Boolean?      @default(false)
+  description description[]
+}
+
+model d_macula {
+  codename    String        @id @db.VarChar(255)
+  name_ru     String?       @default("") @db.VarChar(255)
+  name_kz     String?       @default("") @db.VarChar(255)
+  name_en     String?       @default("") @db.VarChar(255)
+  order       BigInt        @default(autoincrement())
+  hide        Boolean?      @default(false)
+  description description[]
+}
+
+model d_recommendation {
+  codename                   String                       @id @db.VarChar(255)
+  name_ru                    String?                      @default("") @db.VarChar(255)
+  name_kz                    String?                      @default("") @db.VarChar(255)
+  name_en                    String?                      @default("") @db.VarChar(255)
+  order                      BigInt                       @default(autoincrement())
+  hide                       Boolean?                     @default(false)
+  research_to_recommendation research_to_recommendation[]
+}
+
+model d_result_degeneration {
+  codename                          String                              @id @db.VarChar(255)
+  name_ru                           String?                             @db.VarChar(255)
+  name_kz                           String?                             @default("") @db.VarChar(255)
+  name_en                           String?                             @default("") @db.VarChar(255)
+  order                             BigInt                              @default(autoincrement())
+  hide                              Boolean?                            @default(false)
+  conclusion_result_to_degeneration conclusion_result_to_degeneration[]
+}
+
+model d_result_hypertonic {
+  codename                        String                            @id @db.VarChar(255)
+  name_ru                         String?                           @db.VarChar(255)
+  name_kz                         String?                           @default("") @db.VarChar(255)
+  name_en                         String?                           @default("") @db.VarChar(255)
+  order                           BigInt                            @default(autoincrement())
+  hide                            Boolean?                          @default(false)
+  conclusion_result_to_hypertonic conclusion_result_to_hypertonic[]
+}
+
+model d_result_main {
+  codename          String              @id @db.VarChar(255)
+  name_ru           String?             @db.VarChar(255)
+  name_kz           String?             @default("") @db.VarChar(255)
+  name_en           String?             @default("") @db.VarChar(255)
+  order             BigInt              @default(autoincrement())
+  hide              Boolean?            @default(false)
+  conclusion_result conclusion_result[]
+}
+
+model d_result_retinopathy {
+  codename                         String                             @id @db.VarChar(255)
+  name_ru                          String?                            @db.VarChar(255)
+  name_kz                          String?                            @default("") @db.VarChar(255)
+  name_en                          String?                            @default("") @db.VarChar(255)
+  order                            BigInt                             @default(autoincrement())
+  hide                             Boolean?                           @default(false)
+  conclusion_result_to_retinopathy conclusion_result_to_retinopathy[]
+  result_auto_to_retinopathy       result_auto_to_retinopathy[]
+}
+
+model d_retina {
+  codename              String                  @id @db.VarChar(255)
+  name_ru               String?                 @default("") @db.VarChar(255)
+  name_kz               String?                 @default("") @db.VarChar(255)
+  name_en               String?                 @default("") @db.VarChar(255)
+  order                 BigInt                  @default(autoincrement())
+  hide                  Boolean?                @default(false)
+  description_to_retina description_to_retina[]
+}
+
+model d_veins {
+  codename             String                 @id @db.VarChar(255)
+  name_ru              String?                @default("") @db.VarChar(255)
+  name_kz              String?                @default("") @db.VarChar(255)
+  name_en              String?                @default("") @db.VarChar(255)
+  order                BigInt                 @default(autoincrement())
+  hide                 Boolean?               @default(false)
+  description_to_veins description_to_veins[]
+}
+
+model d_vessel {
+  codename    String        @id @db.VarChar(255)
+  name_ru     String?       @default("") @db.VarChar(255)
+  name_kz     String?       @default("") @db.VarChar(255)
+  name_en     String?       @default("") @db.VarChar(255)
+  order       BigInt        @default(autoincrement())
+  hide        Boolean?      @default(false)
+  description description[]
+}
+
+model description {
+  id                    BigInt                  @id @default(autoincrement())
+  disk_codename         String?                 @db.VarChar(255)
+  border_codename       String?                 @db.VarChar(255)
+  fossa_codename        String?                 @db.VarChar(255)
+  macula_codename       String?                 @db.VarChar(255)
+  text                  String?                 @db.VarChar(1000)
+  vessel_codename       String?                 @db.VarChar(255)
+  d_border              d_border?               @relation(fields: [border_codename], references: [codename])
+  d_disk                d_disk?                 @relation(fields: [disk_codename], references: [codename])
+  d_fossa               d_fossa?                @relation(fields: [fossa_codename], references: [codename])
+  d_macula              d_macula?               @relation(fields: [macula_codename], references: [codename])
+  d_vessel              d_vessel?               @relation(fields: [vessel_codename], references: [codename])
+  conclusion            conclusion[]
+  description_to_artery description_to_artery[]
+  description_to_retina description_to_retina[]
+  description_to_veins  description_to_veins[]
+  pre_conclusion_block  pre_conclusion_block[]
+}
+
+model description_to_artery {
+  description_id  BigInt
+  artery_codename String      @db.VarChar(255)
+  id              Int         @id @default(autoincrement())
+  d_artery        d_artery    @relation(fields: [artery_codename], references: [codename])
+  description     description @relation(fields: [description_id], references: [id])
+}
+
+model description_to_retina {
+  description_id  BigInt
+  retina_codename String      @db.VarChar(255)
+  id              Int         @id @default(autoincrement())
+  description     description @relation(fields: [description_id], references: [id])
+  d_retina        d_retina    @relation(fields: [retina_codename], references: [codename])
+}
+
+model description_to_veins {
+  description_id BigInt
+  veins_codename String      @db.VarChar(255)
+  id             Int         @id @default(autoincrement())
+  description    description @relation(fields: [description_id], references: [id])
+  d_veins        d_veins     @relation(fields: [veins_codename], references: [codename])
+}
+
+model eye_image {
+  id           BigInt    @id @default(autoincrement())
+  image        Bytes?
+  is_left      Boolean?
+  research_id  BigInt?
+  content_type String?   @db.VarChar(10)
+  eye_status   String?   @db.VarChar(255)
+  image_name   String?   @db.VarChar(255)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  research     research? @relation(fields: [research_id], references: [id])
+
+  @@index([research_id], name: "idx_eye_image_research_id")
+}
+
+model patient {
+  id        Int     @id @default(autoincrement())
+  iin       String? @unique @db.VarChar(12)
+  full_name String? @db.VarChar(255)
+  phone     String? @db.VarChar(255)
+  email     String? @db.VarChar(255)
+}
+
+model referrer {
+  id                                              BigInt     @id @default(autoincrement())
+  full_name                                       String?    @db.VarChar(255)
+  iin                                             String?    @unique @db.VarChar(12)
+  group_id                                        String?    @db.VarChar(255)
+  research_referrerToresearch_reception_doctor_id research[] @relation("referrerToresearch_reception_doctor_id")
+  research_referrerToresearch_referrer_id         research[] @relation("referrerToresearch_referrer_id")
+
+  @@index([group_id], name: "idx_referrer_group_id")
+}
+
+model research {
+  id                                              BigInt                       @id @default(autoincrement())
+  complaints                                      String?                      @db.VarChar(255)
+  diabetes                                        Boolean?
+  arterial_hypertension                           Boolean?
+  appointment_timestamp                           DateTime?                    @db.Timestamptz(6)
+  research_status                                 research_status_enum?
+  referrer_id                                     BigInt?
+  recommendation_text                             String?                      @db.VarChar(1000)
+  created_timestamp                               DateTime?                    @db.Timestamptz(6)
+  reception_doctor_id                             BigInt?
+  reception_date                                  DateTime?                    @db.Timestamptz(6)
+  source                                          String?                      @db.VarChar(100)
+  group_id                                        String?                      @db.VarChar(255)
+  user_id                                         String?                      @db.VarChar(100)
+  service_count                                   Int?                         @db.SmallInt
+  has_pathalogy                                   Boolean?
+  patient_id                                      String?                      @db.VarChar(255)
+  responsible_doctor_id                           String?
+  refraction_left                                 Float?                       @db.Real
+  service_type                                    String?
+  refraction_right                                Float?                       @db.Real
+  referrer_referrerToresearch_reception_doctor_id referrer?                    @relation("referrerToresearch_reception_doctor_id", fields: [reception_doctor_id], references: [id])
+  referrer_referrerToresearch_referrer_id         referrer?                    @relation("referrerToresearch_referrer_id", fields: [referrer_id], references: [id])
+  d_service_type                                  d_service_type?              @relation(fields: [service_type], references: [codename])
+  auto_conclusion                                 auto_conclusion[]
+  concilium                                       concilium[]
+  conclusion                                      conclusion[]
+  conclusion_auto                                 conclusion_auto[]
+  eye_image                                       eye_image[]
+  research_to_recommendation                      research_to_recommendation[]
+  result_auto                                     result_auto[]
+  shared                                          shared[]
+
+  @@index([group_id], name: "idx_group_id")
+  @@index([research_status], name: "idx_research_research_status")
+  @@index([referrer_id], name: "research_referrer_id_fkey")
+}
+
+model research_to_recommendation {
+  research_id             BigInt?
+  recommendation_codename String?           @db.VarChar(255)
+  id                      BigInt            @id @default(autoincrement())
+  d_recommendation        d_recommendation? @relation(fields: [recommendation_codename], references: [codename])
+  research                research?         @relation(fields: [research_id], references: [id])
+}
+
+model result_auto {
+  id                         BigInt                       @id @default(autoincrement())
+  content_codename           String?                      @db.VarChar(255)
+  timestamp                  DateTime?                    @db.Timestamptz(6)
+  research_id                BigInt?
+  is_left_eye                Boolean?
+  research                   research?                    @relation(fields: [research_id], references: [id])
+  result_auto_to_retinopathy result_auto_to_retinopathy[]
+}
+
+model result_auto_to_retinopathy {
+  result_auto_id       BigInt
+  retinopathy_codename String               @db.VarChar(255)
+  id                   Int                  @id @default(autoincrement())
+  result_auto          result_auto          @relation(fields: [result_auto_id], references: [id])
+  d_result_retinopathy d_result_retinopathy @relation(fields: [retinopathy_codename], references: [codename])
+}
+
+model schemaversion {
+  version BigInt    @id
+  name    String?
+  md5     String?
+  run_at  DateTime? @db.Timestamptz(6)
+}
+
+model sms_logs {
+  id         Int         @id @default(autoincrement())
+  phone      String?     @db.VarChar(63)
+  sms_text   String?
+  created_at DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at DateTime    @default(now()) @db.Timestamptz(6)
+  status     sms_status? @default(in_progress)
+}
+
+model d_service_type {
+  codename String     @id
+  name_ru  String?    @default("")
+  name_kz  String?    @default("")
+  name_en  String?    @default("")
+  research research[]
+}
+
+model notification {
+  id                Int                    @id @default(autoincrement())
+  created_at        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime               @default(now()) @db.Timestamptz(6)
+  notification_type notification_type_enum
+  user_id           String
+  object_id         String
+  is_read           Boolean                @default(false)
+  is_hidden         Boolean                @default(false)
+  deadline          DateTime               @db.Timestamptz(6)
+  payload           Json?
+}
+
+model auto_conclusion {
+  id                Int            @id @default(autoincrement())
+  research_id       BigInt
+  pre_conclusion_id Int
+  pre_conclusion    pre_conclusion @relation(fields: [pre_conclusion_id], references: [id])
+  research          research       @relation(fields: [research_id], references: [id])
+}
+
+model concilium {
+  id             Int              @id @default(autoincrement())
+  research_id    BigInt
+  deadline       DateTime         @db.Timestamptz(6)
+  comment        String
+  research       research         @relation(fields: [research_id], references: [id])
+  concilium_user concilium_user[]
+}
+
+model concilium_user {
+  id                Int                    @id @default(autoincrement())
+  concilium_id      Int
+  user_id           String
+  pre_conclusion_id Int?
+  created_at        DateTime?              @default(now()) @db.Timestamptz(6)
+  concilium_status  concilium_status_enum?
+  concilium         concilium              @relation(fields: [concilium_id], references: [id])
+  pre_conclusion    pre_conclusion?        @relation(fields: [pre_conclusion_id], references: [id])
+}
+
+model pre_conclusion {
+  id                          Int                   @id @default(autoincrement())
+  left_eye_pre_conclusion_id  Int?
+  right_eye_pre_conclusion_id Int?
+  created_at                  DateTime?             @default(now()) @db.Timestamptz(6)
+  recommendation_text         String?
+  pre_conclusion_left_block   pre_conclusion_block? @relation("pre_conclusion_left_eye_pre_conclusion_idTopre_conclusion_block", fields: [left_eye_pre_conclusion_id], references: [id])
+  pre_conclusion_right_block  pre_conclusion_block? @relation("pre_conclusion_right_eye_pre_conclusion_idTopre_conclusion_block", fields: [right_eye_pre_conclusion_id], references: [id])
+  auto_conclusion             auto_conclusion[]
+  concilium_user              concilium_user[]
+  pre_recommendation          pre_recommendation[]
+  shared_user                 shared_user[]
+}
+
+model pre_conclusion_block {
+  id                       Int                        @id @default(autoincrement())
+  description_id           BigInt
+  description              description                @relation(fields: [description_id], references: [id])
+  pre_conclusions_left     pre_conclusion[]           @relation("pre_conclusion_left_eye_pre_conclusion_idTopre_conclusion_block")
+  pre_conclusions_right    pre_conclusion[]           @relation("pre_conclusion_right_eye_pre_conclusion_idTopre_conclusion_block")
+  pre_conclusion_diagnosis pre_conclusion_diagnosis[]
+}
+
+model pre_conclusion_diagnosis {
+  id                                       Int                                        @id @default(autoincrement())
+  result_main_codename                     String
+  pre_conclusion_block_id                  Int
+  text                                     String
+  other                                    String
+  pre_conclusion_block                     pre_conclusion_block                       @relation(fields: [pre_conclusion_block_id], references: [id])
+  pre_conclusion_diagnosis_to_degeneration pre_conclusion_diagnosis_to_degeneration[]
+  pre_conclusion_diagnosis_to_hypertonic   pre_conclusion_diagnosis_to_hypertonic[]
+  pre_conclusion_diagnosis_to_retinopathy  pre_conclusion_diagnosis_to_retinopathy[]
+}
+
+model pre_conclusion_diagnosis_to_degeneration {
+  id                          Int                      @id @default(autoincrement())
+  pre_conclusion_diagnosis_id Int
+  degeneration_codename       String
+  pre_conclusion_diagnosis    pre_conclusion_diagnosis @relation(fields: [pre_conclusion_diagnosis_id], references: [id])
+}
+
+model pre_conclusion_diagnosis_to_hypertonic {
+  id                          Int                      @id @default(autoincrement())
+  pre_conclusion_diagnosis_id Int
+  hypertonic_codename         String
+  pre_conclusion_diagnosis    pre_conclusion_diagnosis @relation(fields: [pre_conclusion_diagnosis_id], references: [id])
+}
+
+model pre_conclusion_diagnosis_to_retinopathy {
+  id                          Int                      @id @default(autoincrement())
+  pre_conclusion_diagnosis_id Int
+  retinopathy_codename        String
+  pre_conclusion_diagnosis    pre_conclusion_diagnosis @relation(fields: [pre_conclusion_diagnosis_id], references: [id])
+}
+
+model pre_recommendation {
+  id                      Int            @id @default(autoincrement())
+  pre_conclusion_id       Int
+  recommendation_codename String
+  pre_conclusion          pre_conclusion @relation(fields: [pre_conclusion_id], references: [id])
+}
+
+model shared {
+  id          Int           @id @default(autoincrement())
+  research_id BigInt
+  research    research      @relation(fields: [research_id], references: [id])
+  shared_user shared_user[]
+}
+
+model shared_user {
+  id                Int             @id @default(autoincrement())
+  shared_id         Int
+  pre_conclusion_id Int?
+  token             String
+  created_at        DateTime?       @default(now()) @db.Timestamptz(6)
+  pre_conclusion    pre_conclusion? @relation(fields: [pre_conclusion_id], references: [id])
+  shared            shared          @relation(fields: [shared_id], references: [id])
+}
+
+enum research_status_enum {
+  IN_PROGRESS
+  FINISHED
+  CANCELLED
+  CREATED
+  TAKEN_TO_WORK
+}
+
+enum sms_status {
+  in_progress
+  success
+  error
+}
+
+enum notification_type_enum {
+  RESEARCH_CREATED
+  DEADLINE_COMING
+  CONCILIUM_CREATED
+  CONCILIUM_ACCEPTED
+  CONCILIUM_REJECTED
+  CONCILIUM_PRECONCLUSION_GIVEN
+  PRECONCLUSION_CREATED
+}
+
+enum concilium_status_enum {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PRECONCLUSION_GIVEN
+}
