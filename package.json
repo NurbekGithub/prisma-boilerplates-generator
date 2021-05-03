@@ -21,6 +21,7 @@
   "dependencies": {
     "@prisma/client": "^2.21.2",
     "@prisma/sdk": "^2.21.2",
+    "@sinclair/typebox": "^0.16.5",
     "change-case": "^4.1.2",
     "fs-extra": "^9.1.0",
     "pluralize": "^8.0.0"

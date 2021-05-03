@@ -23,6 +23,16 @@ async function main() {
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   const dmmf = await getDMMF({ datamodel: schema });
 
+  // fs.writeFileSync("generated.json", JSON.stringify(dmmf.datamodel, null, 2));
+  // console.log(
+  //   ...new Set(
+  //     dmmf.datamodel.models.flatMap((model) =>
+  //       model.fields.map((field) => field.type)
+  //     )
+  //   )
+  // );
+  // return;
+
   const routeFiles = fs
     .readdirSync(`${TEMPLATES_PATH}/${ROUTES_FOLDER}`, { withFileTypes: true })
     .filter((dirent) => dirent.isFile())

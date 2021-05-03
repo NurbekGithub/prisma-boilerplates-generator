@@ -16,7 +16,7 @@ import { db } from "../../db";
 
 declare module "fastify" {
   interface FastifyInstance {
-    get${modelNamePlural}: () => Promise<{${modelNamePlural}: ${NAME}[]}>;
+    get${modelNamePlural}: (where: Prisma.${NAME}WhereInput) => Promise<{${modelNamePlural}: ${NAME}[]}>;
     get${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;
     create${NAME}: (data: Prisma.${NAME}CreateInput) => Promise<{${NAME}: ${NAME}}>;
     update${NAME}: (
@@ -28,8 +28,8 @@ declare module "fastify" {
 }
 
 export const ${SERVICE_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
-  async function get${modelNamePlural}() {
-    const ${modelNamePlural} = await db.${NAME}.findMany();
+  async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput) {
+    const ${modelNamePlural} = await db.${NAME}.findMany({where});
     return { ${modelNamePlural} }
   }
 
