@@ -27,6 +27,24 @@ export type getDetailsParamsParams = {
   idField: ScalarField | undefined;
 };
 
+export type postBodyParams = {
+  scalarFields: ScalarField[];
+  enumFields: DMMF.Field[];
+};
+
+export type putBodyParams = {
+  scalarFields: ScalarField[];
+  enumFields: DMMF.Field[];
+};
+
+export type putParamsParams = {
+  idField: ScalarField | undefined;
+};
+
+export type deleteParamsParams = {
+  idField: ScalarField | undefined;
+};
+
 export type PrismaPrimitive =
   | "String"
   | "Boolean"
