@@ -57,3 +57,13 @@ export type PrismaPrimitive =
   | "BigInt";
 
 export type ScalarField = DMMF.Field & { type: PrismaPrimitive };
+
+export enum HTTP_METHODS {
+  GET = "GET",
+  GET_CURSOR_PAGINATION = "GET (with cursor based pagination)",
+  GET_OFFSET_PAGINATION = "GET (with offset based pagination)",
+  GET_DETAILS = "GET/:id",
+  POST = "POST",
+  PUT = "PUT",
+  DELETE = "DELETE",
+}

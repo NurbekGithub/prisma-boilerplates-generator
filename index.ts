@@ -1,12 +1,17 @@
 import { getDMMF } from "@prisma/sdk";
 import fs from "fs-extra";
-import { controllerParams } from "./types";
+import {
+  OUT_DIR,
+  ROUTES_FOLDER,
+  SCHEMA_PATH,
+  TEMPLATES_PATH,
+} from "./constants";
+import { controllerParams, HTTP_METHODS, ScalarField } from "./types";
+import inquirer from "inquirer";
+import { DMMF } from "@prisma/client/runtime";
+import { isDefaultChecked, isDisabledScalarField } from "./utils";
 
-const SCHEMA_PATH = "prisma/schema.prisma";
-const TEMPLATES_PATH = "templates/fastify-typescript";
-const ROUTES_FOLDER = "routes";
-const OUT_DIR = "src";
-
+inquirer.registerPrompt("search-list", require("inquirer-search-list"));
 interface moduleType {
   file: (args: any) => string;
 }
@@ -22,6 +27,68 @@ async function main() {
   });
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   const dmmf = await getDMMF({ datamodel: schema });
+
+  const answers: {
+    model: string;
+    methods: HTTP_METHODS[];
+  } = await inquirer.prompt([
+    {
+      name: "model",
+      message: "choose model to use with generator",
+      type: "search-list",
+      choices: dmmf.datamodel.models.map((model) => model.name),
+    },
+    {
+      name: "methods",
+      type: "checkbox",
+      choices: [
+        HTTP_METHODS.GET,
+        HTTP_METHODS.GET_CURSOR_PAGINATION,
+        HTTP_METHODS.GET_OFFSET_PAGINATION,
+        HTTP_METHODS.GET_DETAILS,
+        HTTP_METHODS.POST,
+        HTTP_METHODS.PUT,
+        HTTP_METHODS.DELETE,
+      ],
+    },
+  ]);
+
+  const model = dmmf.datamodel.models.find(
+    (model) => model.name === answers.model
+  )!;
+
+  for (const method of answers.methods) {
+    // this is needed to prevent circular relations
+    // e.g. user -> post -> user
+    let relationsChain = [model.name];
+    const answers: {
+      [method in HTTP_METHODS]: DMMF.Field[];
+    } = await inquirer.prompt({
+      name: method,
+      message: `Choose fields for ${method}`,
+      type: "checkbox",
+      choices: model.fields.map((field) => ({
+        name: `${field.name} (${field.type})`,
+        checked: isDefaultChecked(field),
+        disabled:
+          field.kind === "scalar" &&
+          isDisabledScalarField(field as ScalarField),
+        // value: field,
+      })),
+    });
+
+    // for (const relation of answers[method].filter(field => field.kind === "object")) {
+    //   relationsChain.push(relation.name);
+
+    // }
+
+    console.log(answers);
+  }
+
+  inquirer.prompt([]);
+
+  console.log(answers);
+  // return;
 
   // fs.writeFileSync("generated.json", JSON.stringify(dmmf.datamodel, null, 2));
   // console.log(
