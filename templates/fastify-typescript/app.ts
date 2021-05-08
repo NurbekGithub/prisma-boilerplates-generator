@@ -4,12 +4,13 @@ import Env from "fastify-env";
 import UnderPressure from "under-pressure";
 import { join } from "path";
 import { FastifyPluginAsync } from "fastify";
-import Helmet from "fastify-helmet";
 import { Static, Type } from "@sinclair/typebox";
 
-const envProperties = Type.Object({
-  NODE_ENV: Type.String(),
-});
+const envProperties = Type.Strict(
+  Type.Object({
+    NODE_ENV: Type.String(),
+  })
+);
 declare module "fastify" {
   interface FastifyInstance {
     config: Static<typeof envProperties>;
@@ -41,12 +42,6 @@ const app: FastifyPluginAsync = async (fastify, opts) => {
   // See the list of recognized plugins  by the core team! https://www.fastify.io/ecosystem/
   // `fastify-sensible` adds many  small utilities, such as nice http errors.
   fastify.register(Sensible);
-
-  // `fastify-helmet` helps you secure your application
-  // with important security headers. It's not a silver bullet™,
-  // but security is an orchestraton of multiple tools that work
-  // together to reduce the attack surface of your application.
-  fastify.register(Helmet);
 
   // This plugin is especially useful if you expect an high load
   // on your application, it measures the process load and returns

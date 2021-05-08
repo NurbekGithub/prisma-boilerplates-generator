@@ -10,7 +10,10 @@ import {
 } from "../../../types";
 
 function getRoute(params: routeParams) {
-  const modelNamePlural = pluralize(params.modelName);
+  let modelNamePlural = pluralize(params.modelName);
+  if (modelNamePlural === params.modelName) {
+    modelNamePlural += "es";
+  }
   return `fastify.get<{ Querystring: schemaOpts.GetQueryStatic }>("/", schemaOpts.GetOpts, async (req) => {
     const { ${modelNamePlural} } = await fastify.get${modelNamePlural}(req.query);
     return {
@@ -18,6 +21,8 @@ function getRoute(params: routeParams) {
     };
   });`;
 }
+
+// TODO: GLOBAL NAME AND PLURAL NAME
 
 function getDetailsRoute(params: routeParams) {
   const NAME = params.modelName;

@@ -4,7 +4,11 @@ import { serviceParams, templateConfig } from "../../../../types";
 export default function file(params: serviceParams) {
   const NAME = params.model.name;
   const SERVICE_NAME = NAME + "Service";
-  const modelNamePlural = pluralize(NAME);
+  let modelNamePlural = pluralize(NAME);
+
+  if (modelNamePlural === NAME) {
+    modelNamePlural += "es";
+  }
   // if no nested params selected for POST and PUT methods
   // we will use uncheck version of prisma data type
   const POST_UNCHECKED_PREFIX =
@@ -19,7 +23,8 @@ export default function file(params: serviceParams) {
     Object.values(params.selection.PUT).every((val) => typeof val === "boolean")
       ? "Unchecked"
       : "";
-  return `import { Prisma, ${NAME} } from "@prisma/client";
+  return `import fp from 'fastify-plugin'
+import { Prisma, ${NAME} } from "@prisma/client";
 import { FastifyPluginAsync } from "fastify";
 import { db } from "../../db";
 
@@ -36,7 +41,7 @@ declare module "fastify" {
   }
 }
 
-export const ${SERVICE_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
+export const ${SERVICE_NAME}: FastifyPluginAsync = fp(async (fastify, _opts) => {
   async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput) {
     const ${modelNamePlural} = await db.${NAME}.findMany({where});
     return { ${modelNamePlural} }
@@ -67,7 +72,7 @@ export const ${SERVICE_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
   fastify.decorate("create${NAME}", create${NAME})
   fastify.decorate("update${NAME}", update${NAME})
   fastify.decorate("delete${NAME}", delete${NAME})
-}
+})
 `;
 }
 
