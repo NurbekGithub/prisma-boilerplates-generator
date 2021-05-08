@@ -10,10 +10,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator jsonSchema {
-  provider = "prisma-json-schema-generator"
-}
-
 model conclusion {
   id                   BigInt              @id @default(autoincrement())
   conclusion_timestamp DateTime?           @db.Timestamptz(6)

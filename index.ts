@@ -6,27 +6,82 @@ import {
   SCHEMA_PATH,
   TEMPLATES_PATH,
 } from "./constants";
-import { controllerParams, HTTP_METHODS, ScalarField } from "./types";
+import {
+  controllerParams,
+  HTTP_METHODS,
+  ScalarField,
+  selectionType,
+} from "./types";
 import inquirer from "inquirer";
 import { DMMF } from "@prisma/client/runtime";
 import { isDefaultChecked, isDisabledScalarField } from "./utils";
 
 inquirer.registerPrompt("search-list", require("inquirer-search-list"));
 interface moduleType {
-  file: (args: any) => string;
+  default: (args: any) => string;
 }
 
 interface routeModuleType extends moduleType {
-  file: (args?: controllerParams) => string;
+  default: (args: controllerParams) => string;
+}
+
+async function getRelationAnwers(
+  models: DMMF.Model[],
+  relationsChain: string[],
+  objectFields: DMMF.Field[]
+) {
+  const res: { [key: string]: any } = {};
+  for (const relation of objectFields) {
+    const model = models.find((model) => model.name === relation.name)!;
+    const relationAnswers: {
+      [relationName: string]: DMMF.Field[];
+    } = await inquirer.prompt({
+      name: relation.name,
+      message: `Choose sub fields of ${relation.name} for ${relationsChain.join(
+        "---"
+      )}`,
+      type: "checkbox",
+      choices: model.fields.map((field) => ({
+        name: `${field.name} (${field.type})`,
+        checked: isDefaultChecked(field),
+        disabled:
+          (field.kind === "scalar" &&
+            isDisabledScalarField(field as ScalarField)) ||
+          relationsChain.includes(field.name),
+        value: field,
+      })),
+    });
+
+    const normalized = relationAnswers[relation.name].reduce(
+      (a, v) => ({
+        ...a,
+        [v.name]: true,
+      }),
+      {}
+    );
+
+    const answers = await getRelationAnwers(
+      models,
+      [...relationsChain, relation.name],
+      relationAnswers[relation.name].filter((field) => field.kind === "object")
+    );
+
+    res[relation.name] = { ...normalized, ...answers };
+  }
+
+  return res;
 }
 
 async function main() {
-  fs.copySync(TEMPLATES_PATH, OUT_DIR, {
-    overwrite: false,
-    filter: (src) => !src.includes("{{modelName}}"),
-  });
+  if (!fs.existsSync(OUT_DIR)) {
+    fs.copySync(TEMPLATES_PATH, OUT_DIR, {
+      overwrite: false,
+      filter: (src) => !src.includes("{{modelName}}"),
+    });
+  }
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   const dmmf = await getDMMF({ datamodel: schema });
+  const selection: selectionType = {};
 
   const answers: {
     model: string;
@@ -58,10 +113,7 @@ async function main() {
   )!;
 
   for (const method of answers.methods) {
-    // this is needed to prevent circular relations
-    // e.g. user -> post -> user
-    let relationsChain = [model.name];
-    const answers: {
+    const methodAnswers: {
       [method in HTTP_METHODS]: DMMF.Field[];
     } = await inquirer.prompt({
       name: method,
@@ -73,38 +125,35 @@ async function main() {
         disabled:
           field.kind === "scalar" &&
           isDisabledScalarField(field as ScalarField),
-        // value: field,
+        value: field,
       })),
     });
 
-    // for (const relation of answers[method].filter(field => field.kind === "object")) {
-    //   relationsChain.push(relation.name);
+    const normalized = methodAnswers[method].reduce(
+      (a, v) => ({
+        ...a,
+        [v.name]: true,
+      }),
+      {}
+    );
 
-    // }
+    let objectFields = methodAnswers[method].filter(
+      (field) => field.kind === "object"
+    );
 
-    console.log(answers);
+    // this is needed to prevent circular relations
+    // e.g. user -> post -> user
+    const relationsChain = [model.name];
+    const answers = await getRelationAnwers(
+      dmmf.datamodel.models,
+      relationsChain,
+      objectFields
+    );
+
+    selection[method] = { ...normalized, ...answers };
   }
 
-  inquirer.prompt([]);
-
-  console.log(answers);
-  // return;
-
-  // fs.writeFileSync("generated.json", JSON.stringify(dmmf.datamodel, null, 2));
-  // console.log(
-  //   ...new Set(
-  //     dmmf.datamodel.models.flatMap((model) =>
-  //       model.fields.map((field) => field.type)
-  //     )
-  //   )
-  // );
-  // return;
-
-  const routeFiles = fs
-    .readdirSync(`${TEMPLATES_PATH}/${ROUTES_FOLDER}`, { withFileTypes: true })
-    .filter((dirent) => dirent.isFile())
-    .map((dirent) => dirent.name);
-
+  // for services and types
   const routeDirs = fs
     .readdirSync(`${TEMPLATES_PATH}/${ROUTES_FOLDER}`, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
@@ -120,34 +169,63 @@ async function main() {
       .map((dirent) => dirent.name);
 
     for (const dirFile of dirFiles) {
-      const module: routeModuleType = await import(
-        `${process.cwd()}/${srcDirPath}/${dirFile}`
-      );
+      const path = `${outDirPath}/${dirFile.replace(
+        "{{modelName}}",
+        model.name
+      )}`;
+      let canWrite = true;
+      if (fs.existsSync(path)) {
+        const answer: { replace: boolean } = await inquirer.prompt({
+          type: "confirm",
+          message: `${path} already exists. Replace?`,
+          name: "replace",
+          default: false,
+        });
 
-      for (const model of dmmf.datamodel.models) {
-        const file = module.file({ model });
-        fs.writeFileSync(
-          `${outDirPath}/${dirFile.replace("{{modelName}}", model.name)}`,
-          file
+        canWrite = answer.replace;
+      }
+
+      if (canWrite) {
+        const module: routeModuleType = await import(
+          `${process.cwd()}/${srcDirPath}/${dirFile}`
         );
+
+        const file = module.default({ model, selection });
+        fs.writeFileSync(path, file);
       }
     }
   }
 
-  for (const routeFile of routeFiles) {
-    const module: routeModuleType = await import(
-      `${process.cwd()}/${TEMPLATES_PATH}/${ROUTES_FOLDER}/${routeFile}`
-    );
+  // for route
+  const routeFiles = fs
+    .readdirSync(`${TEMPLATES_PATH}/${ROUTES_FOLDER}`, { withFileTypes: true })
+    .filter((dirent) => dirent.isFile())
+    .map((dirent) => dirent.name);
 
-    for (const model of dmmf.datamodel.models) {
-      const file = module.file({ model });
-      fs.writeFileSync(
-        `${OUT_DIR}/${ROUTES_FOLDER}/${routeFile.replace(
-          "{{modelName}}",
-          model.name
-        )}`,
-        file
+  for (const routeFile of routeFiles) {
+    const path = `${OUT_DIR}/${ROUTES_FOLDER}/${routeFile.replace(
+      "{{modelName}}",
+      model.name
+    )}`;
+    let canWrite = true;
+    if (fs.existsSync(path)) {
+      const answer: { replace: boolean } = await inquirer.prompt({
+        type: "confirm",
+        message: `${path} already exists. Replace?`,
+        name: "replace",
+        default: false,
+      });
+
+      canWrite = answer.replace;
+    }
+
+    if (canWrite) {
+      const module: routeModuleType = await import(
+        `${process.cwd()}/${TEMPLATES_PATH}/${ROUTES_FOLDER}/${routeFile}`
       );
+
+      const file = module.default({ model, selection });
+      fs.writeFileSync(path, file);
     }
   }
 }

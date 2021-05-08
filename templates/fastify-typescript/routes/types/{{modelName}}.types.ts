@@ -8,6 +8,7 @@ import {
   putBodyParams,
   putParamsParams,
   ScalarField,
+  templateConfig,
   typeParams,
 } from "../../../../types";
 import { getTypeboxModifier, getTypeboxScalar } from "../../../../utils";
@@ -104,7 +105,7 @@ function deleteParams(params: deleteParamsParams) {
   })`;
 }
 
-export function file(params: typeParams) {
+export default function file(params: typeParams) {
   const NAME = params.model.name;
   const modelNamePlural = pluralize(NAME);
   const scalarFields = params.model.fields.filter(
@@ -116,8 +117,7 @@ export function file(params: typeParams) {
   const idField = params.model.fields.find((field) => field.isId) as
     | ScalarField
     | undefined;
-  return `
-import { Type, Static } from "@sinclair/typebox";
+  return `import { Type, Static } from "@sinclair/typebox";
 ${
   enumFields.length > 0
     ? `import { ${enumFields
@@ -196,3 +196,7 @@ export const DeleteOpts = {
 export type DeleteParamsStatic = Static<typeof DeleteOpts.schema.params>;
 `;
 }
+
+export const config: templateConfig = {
+  outPath: "",
+};

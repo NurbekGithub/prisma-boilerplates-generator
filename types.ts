@@ -2,6 +2,12 @@ import { DMMF } from "@prisma/generator-helper";
 
 export type controllerParams = {
   model: DMMF.Model;
+  selection: selectionType;
+};
+
+export type serviceParams = {
+  model: DMMF.Model;
+  selection: selectionType;
 };
 
 export type routeParams = {
@@ -67,3 +73,11 @@ export enum HTTP_METHODS {
   PUT = "PUT",
   DELETE = "DELETE",
 }
+
+export type templateConfig = {
+  outPath: string;
+};
+
+export type selectionType = {
+  [key in HTTP_METHODS]?: { [key: string]: boolean | object };
+};

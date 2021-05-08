@@ -1,12 +1,17 @@
 import { DMMF } from "@prisma/generator-helper";
 import pluralize from "pluralize";
 import changeCase from "change-case";
-import { controllerParams, routeParams, ScalarField } from "../../../types";
+import {
+  controllerParams,
+  HTTP_METHODS,
+  routeParams,
+  ScalarField,
+  templateConfig,
+} from "../../../types";
 
 function getRoute(params: routeParams) {
   const modelNamePlural = pluralize(params.modelName);
-  return `
-  fastify.get<{ Querystring: schemaOpts.GetQueryStatic }>("/", schemaOpts.GetOpts, async (req) => {
+  return `fastify.get<{ Querystring: schemaOpts.GetQueryStatic }>("/", schemaOpts.GetOpts, async (req) => {
     const { ${modelNamePlural} } = await fastify.get${modelNamePlural}(req.query);
     return {
       ${modelNamePlural}
@@ -17,8 +22,7 @@ function getRoute(params: routeParams) {
 function getDetailsRoute(params: routeParams) {
   const NAME = params.modelName;
   const ID = params.idField!.name;
-  return `
-  fastify.get<{ Params: schemaOpts.GetDetailsParamsStatic }>("/:${ID}", schemaOpts.GetDetailsOpts, async (req) => {
+  return `fastify.get<{ Params: schemaOpts.GetDetailsParamsStatic }>("/:${ID}", schemaOpts.GetDetailsOpts, async (req) => {
     const { ${ID} } = req.params;
     const { ${NAME} } = await fastify.get${NAME}({ ${ID} });
     return {
@@ -29,8 +33,7 @@ function getDetailsRoute(params: routeParams) {
 
 function postRoute(params: routeParams) {
   const NAME = params.modelName;
-  return `
-  fastify.post<{ Body: schemaOpts.PostBodyStatic }>("/", schemaOpts.PostOpts, async (req) => {
+  return `fastify.post<{ Body: schemaOpts.PostBodyStatic }>("/", schemaOpts.PostOpts, async (req) => {
     const data = req.body;
     const { ${NAME} } = await fastify.create${NAME}(data);
     return {
@@ -42,8 +45,7 @@ function postRoute(params: routeParams) {
 function putRoute(params: routeParams) {
   const NAME = params.modelName;
   const ID = params.idField!.name;
-  return `
-  fastify.put<{ Body: schemaOpts.PutBodyStatic, Params: schemaOpts.PutParamsStatic }>("/:${ID}", schemaOpts.PutOpts, async (req) => {
+  return `fastify.put<{ Body: schemaOpts.PutBodyStatic, Params: schemaOpts.PutParamsStatic }>("/:${ID}", schemaOpts.PutOpts, async (req) => {
     const { ${ID} } = req.params;
     const data = req.body;
     const { ${NAME} } = await fastify.update${NAME}(data, { ${ID} });
@@ -56,8 +58,7 @@ function putRoute(params: routeParams) {
 function deleteRoute(params: routeParams) {
   const NAME = params.modelName;
   const ID = params.idField!.name;
-  return `
-  fastify.delete<{ Params: schemaOpts.DeleteParamsStatic }>("/:${ID}", schemaOpts.DeleteOpts, async (req) => {
+  return `fastify.delete<{ Params: schemaOpts.DeleteParamsStatic }>("/:${ID}", schemaOpts.DeleteOpts, async (req) => {
     const { ${ID} } = req.params;
     const { ${NAME} } = await fastify.delete${NAME}({ ${ID} });
     return {
@@ -66,7 +67,7 @@ function deleteRoute(params: routeParams) {
   });`;
 }
 
-export function file(params: controllerParams) {
+export default function file(params: controllerParams) {
   const NAME = params.model.name;
   const SERVICE_NAME = NAME + "Service";
   const CONTROLLER_NAME = NAME + "Controller";
@@ -75,23 +76,47 @@ export function file(params: controllerParams) {
     | ScalarField
     | undefined;
 
-  return `
-import { FastifyPluginAsync } from "fastify";
+  return `import { FastifyPluginAsync } from "fastify";
 import {${SERVICE_NAME}} from "./services/${NAME}.service"
 import * as schemaOpts from "./types/${NAME}.types"
 
 const ${CONTROLLER_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
 
-  fastify.register(${SERVICE_NAME})
+  await fastify.register(${SERVICE_NAME})
 
-  ${getRoute({ modelName: NAME })}
-  ${getDetailsRoute({ modelName: NAME, idField })}
-  ${postRoute({ modelName: NAME })}
-  ${putRoute({ modelName: NAME, idField })}
-  ${deleteRoute({ modelName: NAME, idField })}
+  // GET
+  ${params.selection.GET ? getRoute({ modelName: NAME }) : "//Not selected"}
+  // GET/:id
+  ${
+    params.selection[HTTP_METHODS.GET_DETAILS]
+      ? getDetailsRoute({ modelName: NAME, idField })
+      : "//Not selected"
+  }
+  // POST
+  ${
+    params.selection[HTTP_METHODS.POST]
+      ? postRoute({ modelName: NAME })
+      : "//Not selected"
+  }
+  // PUT
+  ${
+    params.selection[HTTP_METHODS.PUT]
+      ? putRoute({ modelName: NAME, idField })
+      : "//Not selected"
+  }
+  // DELETE
+  ${
+    params.selection[HTTP_METHODS.DELETE]
+      ? deleteRoute({ modelName: NAME, idField })
+      : "//Not selected"
+  }
 };
 
 export const autoPrefix = "/${NAME}";
 export default ${CONTROLLER_NAME}; 
 `;
 }
+
+export const config: templateConfig = {
+  outPath: "",
+};
