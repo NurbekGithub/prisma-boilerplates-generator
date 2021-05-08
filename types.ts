@@ -17,11 +17,13 @@ export type routeParams = {
 
 export type typeParams = {
   model: DMMF.Model;
+  selection: selectionType;
 };
 
 export type getResponseParams = {
   scalarFields: ScalarField[];
   enumFields: DMMF.Field[];
+  selection: selectionType[HTTP_METHODS.GET];
 };
 
 export type getQueryParams = {
@@ -31,16 +33,19 @@ export type getQueryParams = {
 
 export type getDetailsParamsParams = {
   idField: ScalarField | undefined;
+  selection: selectionType[HTTP_METHODS.GET_DETAILS];
 };
 
 export type postBodyParams = {
   scalarFields: ScalarField[];
   enumFields: DMMF.Field[];
+  selection: selectionType[HTTP_METHODS.POST];
 };
 
 export type putBodyParams = {
   scalarFields: ScalarField[];
   enumFields: DMMF.Field[];
+  selection: selectionType[HTTP_METHODS.PUT];
 };
 
 export type putParamsParams = {
@@ -78,6 +83,8 @@ export type templateConfig = {
   outPath: string;
 };
 
-export type selectionType = {
-  [key in HTTP_METHODS]?: { [key: string]: boolean | object };
+export type selectionType = { [key: string]: DMMF.Field | selectionType };
+
+export type selectionAnswerType = {
+  [key in HTTP_METHODS]?: selectionType;
 };

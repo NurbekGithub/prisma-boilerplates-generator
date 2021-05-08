@@ -13,24 +13,29 @@ import {
 } from "../../../../types";
 import { getTypeboxModifier, getTypeboxScalar } from "../../../../utils";
 
+// function getResponse(params: getResponseParams) {
+//   return `Type.Object({
+//     ${params.scalarFields
+//       .map(
+//         (field) =>
+//           `${field.name}: Type.${getTypeboxModifier(
+//             field.isRequired
+//           )}(Type.${getTypeboxScalar(field.type)}())`
+//       )
+//       .join(",\n")},
+//     ${params.enumFields
+//       .map(
+//         (field) =>
+//           `${field.name}: Type.${getTypeboxModifier(
+//             field.isRequired
+//           )}(Type.Enum(${field.type}))`
+//       )
+//       .join(",\n")}
+//   })`;
+// }
 function getResponse(params: getResponseParams) {
   return `Type.Object({
-    ${params.scalarFields
-      .map(
-        (field) =>
-          `${field.name}: Type.${getTypeboxModifier(
-            field.isRequired
-          )}(Type.${getTypeboxScalar(field.type)}())`
-      )
-      .join(",\n")},
-    ${params.enumFields
-      .map(
-        (field) =>
-          `${field.name}: Type.${getTypeboxModifier(
-            field.isRequired
-          )}(Type.Enum(${field.type}))`
-      )
-      .join(",\n")}
+    ${Object.keys(params.selection!).map()}
   })`;
 }
 
@@ -128,11 +133,18 @@ ${
 
 export const GetOpts = {
   schema: {
-    query: ${getQuery({ scalarFields, enumFields })},
+    query: ${getQuery({
+      scalarFields,
+      enumFields,
+    })},
     response: {
       200: Type.Object({
         ${modelNamePlural}: Type.Array(
-          ${getResponse({ enumFields, scalarFields })}
+          ${getResponse({
+            enumFields,
+            scalarFields,
+            selection: params.selection.GET,
+          })}
         )
       }),
     },

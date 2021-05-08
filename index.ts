@@ -10,6 +10,7 @@ import {
   controllerParams,
   HTTP_METHODS,
   ScalarField,
+  selectionAnswerType,
   selectionType,
 } from "./types";
 import inquirer from "inquirer";
@@ -30,7 +31,7 @@ async function getRelationAnwers(
   relationsChain: string[],
   objectFields: DMMF.Field[]
 ) {
-  const res: { [key: string]: any } = {};
+  const selection: selectionType = {};
   for (const relation of objectFields) {
     const model = models.find((model) => model.name === relation.name)!;
     const relationAnswers: {
@@ -52,10 +53,12 @@ async function getRelationAnwers(
       })),
     });
 
-    const normalized = relationAnswers[relation.name].reduce(
+    const normalized: { [key: string]: DMMF.Field } = relationAnswers[
+      relation.name
+    ].reduce(
       (a, v) => ({
         ...a,
-        [v.name]: true,
+        [v.name]: v,
       }),
       {}
     );
@@ -66,10 +69,10 @@ async function getRelationAnwers(
       relationAnswers[relation.name].filter((field) => field.kind === "object")
     );
 
-    res[relation.name] = { ...normalized, ...answers };
+    selection[relation.name] = { ...normalized, ...answers };
   }
 
-  return res;
+  return selection;
 }
 
 async function main() {
@@ -81,7 +84,7 @@ async function main() {
   }
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   const dmmf = await getDMMF({ datamodel: schema });
-  const selection: selectionType = {};
+  const selection: selectionAnswerType = {};
 
   const answers: {
     model: string;
@@ -132,7 +135,7 @@ async function main() {
     const normalized = methodAnswers[method].reduce(
       (a, v) => ({
         ...a,
-        [v.name]: true,
+        [v.name]: v,
       }),
       {}
     );
