@@ -1,6 +1,6 @@
 import { DMMF } from "@prisma/generator-helper";
 import { TOKENS_TO_IGNORE } from "./constants";
-import { PrismaPrimitive, ScalarField } from "./types";
+import { PrismaPrimitive, ScalarField, selectionType } from "./types";
 
 export function getTypeboxScalar(fieldType: PrismaPrimitive): string {
   switch (fieldType) {
@@ -41,4 +41,32 @@ export function isDefaultChecked(field: DMMF.Field) {
 
 export function isDisabledScalarField(field: ScalarField) {
   return field.type === "Bytes";
+}
+
+export function getScalarFields(fields: DMMF.Field[]) {
+  return fields.filter((field) => field.kind === "scalar") as ScalarField[];
+}
+
+export function getScalarFieldsWithoutId(fields: DMMF.Field[]) {
+  return fields.filter(
+    (field) => field.kind === "scalar" && !field.isId
+  ) as ScalarField[];
+}
+
+export function getEnumFields(fields: DMMF.Field[]) {
+  return fields.filter((field) => field.kind === "enum");
+}
+
+export function getObjectFields(fields: DMMF.Field[]) {
+  return fields.filter((field) => field.kind === "object");
+}
+
+export function getIdField(fields: DMMF.Field[]) {
+  return fields.find((field) => field.isId) as ScalarField | undefined;
+}
+
+export function hasObjectField(fields: selectionType[] | undefined) {
+  return Boolean(
+    fields && Object.values(fields).some((val) => val.kind === "object")
+  );
 }

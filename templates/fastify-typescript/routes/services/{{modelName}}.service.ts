@@ -1,5 +1,236 @@
 import pluralize from "pluralize";
-import { serviceParams, templateConfig } from "../../../../types";
+import {
+  HTTP_METHODS,
+  selectionType,
+  ServiceParams,
+  serviceParams,
+  templateConfig,
+} from "../../../../types";
+import {
+  getEnumFields,
+  getIdField,
+  getObjectFields,
+  getScalarFields,
+  getScalarFieldsWithoutId,
+  hasObjectField,
+} from "../../../../utils";
+
+export function getPrismaSelection(fields: selectionType[]): string {
+  const scalarOrEnumFields = [
+    ...getScalarFields(fields),
+    ...getEnumFields(fields),
+  ];
+  const objectFields = getObjectFields(fields) as selectionType[];
+  return `select: {
+    ${scalarOrEnumFields.map((field) => `${field.name}: true,`).join("\n")}
+    ${objectFields.map(
+      (field) => `${field.name}: {${getPrismaSelection(field.values)}}`
+    )}
+  }`;
+}
+
+export function getCreateData(
+  fields: selectionType[],
+  isFirstLevel: boolean,
+  relationsChain: string[] = []
+): string {
+  const scalarOrEnumFields = [
+    ...getScalarFieldsWithoutId(fields),
+    ...getEnumFields(fields),
+  ];
+  const objectFields = getObjectFields(fields) as selectionType[];
+
+  if (isFirstLevel) {
+    return `data: {
+      ${scalarOrEnumFields
+        .map((field) => `${field.name}: data.${field.name},`)
+        .join("\n")}
+      ${objectFields
+        .map(
+          (field) =>
+            `${field.name}: {${getCreateData(field.values, false, [
+              field.name,
+            ])}}`
+        )
+        .join(",\n")}
+    }`;
+  }
+
+  // if sub relation data has idField
+  // try to find it and connect instead of just create
+  const idField = getIdField(fields);
+  if (idField) {
+    return `connectOrCreate: {
+      where: {${idField.name}: data.${relationsChain.join(".")}.${idField.name}}
+      ${getCreateData(
+        fields.filter((field) => !field.isId),
+        false,
+        relationsChain
+      )}
+    }`;
+  }
+  // just create
+  return `create: {
+    ${scalarOrEnumFields
+      .map(
+        (field) =>
+          `${field.name}: data.${relationsChain.join(".")}.${field.name},`
+      )
+      .join("\n")}
+    ${objectFields
+      .map(
+        (field) =>
+          `${field.name}: {${getCreateData(field.values, false, [
+            ...relationsChain,
+            field.name,
+          ])}}`
+      )
+      .join(",\n")}
+  }`;
+}
+
+export function getUpdateData(
+  fields: selectionType[],
+  isFirstLevel: boolean,
+  relationsChain: string[] = []
+): string {
+  const scalarOrEnumFields = [
+    ...getScalarFieldsWithoutId(fields),
+    ...getEnumFields(fields),
+  ];
+  const objectFields = getObjectFields(fields) as selectionType[];
+
+  if (isFirstLevel) {
+    return `data: {
+      ${scalarOrEnumFields
+        .map((field) => `${field.name}: data.${field.name},`)
+        .join("\n")}
+      ${objectFields
+        .map(
+          (field) =>
+            `${field.name}: ${getUpdateData(field.values, false, [field.name])}`
+        )
+        .join(",\n")}
+    }`;
+  }
+
+  const idField = getIdField(fields);
+  if (idField) {
+    return `upsert: {
+      where: {${idField.name}: data.${relationsChain.join(".")}.${idField.name}}
+      ${getCreateData(
+        fields.filter((field) => !field.isId),
+        false,
+        relationsChain
+      )}
+      ${getUpdateData(
+        fields.filter((field) => !field.isId),
+        false,
+        relationsChain
+      )}
+    }`;
+  }
+  return `update: {
+      ${scalarOrEnumFields
+        .map(
+          (field) =>
+            `${field.name}: data.${relationsChain.join(".")}.${field.name},`
+        )
+        .join("\n")}
+      ${objectFields
+        .map(
+          (field) =>
+            `${field.name}: ${getUpdateData(field.values, false, [
+              ...relationsChain,
+              field.name,
+            ])}`
+        )
+        .join(",\n")}
+    }`;
+}
+
+// TODO: come up with better naming for types (ServiceParams, serviceParams)
+function getGetService({ model, selection }: ServiceParams) {
+  if (!selection) return "";
+  const NAME = model.name;
+  let modelNamePlural = pluralize(NAME);
+
+  //TODO: make NAME, PLURAL_NAME global
+  if (modelNamePlural === NAME) {
+    modelNamePlural += "es";
+  }
+  return `async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput) {
+    const ${modelNamePlural} = await db.${NAME}.findMany({where, ${getPrismaSelection(
+    selection
+  )}});
+    return { ${modelNamePlural} }
+  }`;
+}
+
+function getGetDetailsService({ model, selection }: ServiceParams) {
+  if (!selection) return "";
+  const NAME = model.name;
+
+  return `async function get${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
+    const ${NAME} = await db.${NAME}.findUnique({ where, ${getPrismaSelection(
+    selection
+  )} });
+    return { ${NAME} }
+  }`;
+}
+
+function getPostService({
+  model,
+  selection,
+  postDataType,
+}: ServiceParams & { postDataType: string }) {
+  if (!selection) return "";
+  const NAME = model.name;
+
+  return `async function create${NAME}(data: ${postDataType}) {
+    const ${NAME} = await db.${NAME}.create({
+      ${getCreateData(selection, true)},
+      ${getPrismaSelection(selection)},
+    });
+    return { ${NAME} }
+  }`;
+}
+
+function getPutService({
+  model,
+  selection,
+  putDataType,
+}: ServiceParams & { putDataType: string }) {
+  if (!selection) return "";
+  const NAME = model.name;
+
+  return `async function update${NAME}(data: ${putDataType}, where: Prisma.${NAME}WhereUniqueInput) {
+    const ${NAME} = await db.${NAME}.update({
+      where,
+      ${getUpdateData(selection, true)},
+      ${getPrismaSelection(selection)},
+    });
+    return { ${NAME} }
+  }`;
+}
+
+function getDeleteService({ model, selection }: ServiceParams) {
+  if (!selection) return "";
+  const NAME = model.name;
+
+  return `async function delete${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
+    const ${NAME} = await db.${NAME}.delete({ where });
+    return { ${NAME} }
+  }`;
+}
+
+function getStringByMethod(
+  method: selectionType[] | undefined,
+  string: string
+) {
+  if (method) return string;
+  return "";
+}
 
 export default function file(params: serviceParams) {
   const NAME = params.model.name;
@@ -11,67 +242,94 @@ export default function file(params: serviceParams) {
   }
   // if no nested params selected for POST and PUT methods
   // we will use uncheck version of prisma data type
-  const POST_UNCHECKED_PREFIX =
-    params.selection.POST &&
-    Object.values(params.selection.POST).every(
-      (val) => typeof val === "boolean"
-    )
-      ? "Unchecked"
-      : "";
-  const PUT_UNCHECKED_PREFIX =
-    params.selection.PUT &&
-    Object.values(params.selection.PUT).every((val) => typeof val === "boolean")
-      ? "Unchecked"
-      : "";
+  let postDataType = `Prisma.${NAME}UncheckedCreateInput`;
+  if (hasObjectField(params.selection[HTTP_METHODS.POST])) {
+    postDataType = "schemaOpts.PostBodyStatic";
+  }
+  let putDataType = `Prisma.${NAME}UncheckedUpdateInput`;
+  if (hasObjectField(params.selection[HTTP_METHODS.PUT])) {
+    postDataType = "schemaOpts.PutBodyStatic";
+  }
+
   return `import fp from 'fastify-plugin'
 import { Prisma, ${NAME} } from "@prisma/client";
 import { FastifyPluginAsync } from "fastify";
+import * as schemaOpts from "../types/${NAME}.types"
 import { db } from "../../db";
 
 declare module "fastify" {
   interface FastifyInstance {
-    get${modelNamePlural}: (where: Prisma.${NAME}WhereInput) => Promise<{${modelNamePlural}: ${NAME}[]}>;
-    get${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;
-    create${NAME}: (data: Prisma.${NAME}${POST_UNCHECKED_PREFIX}CreateInput) => Promise<{${NAME}: ${NAME}}>;
-    update${NAME}: (
-      data: Prisma.${NAME}${PUT_UNCHECKED_PREFIX}UpdateInput,
-      where: Prisma.${NAME}WhereUniqueInput
-    ) => Promise<{${NAME}: ${NAME}}>;
-    delete${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;
+    ${getStringByMethod(
+      params.selection[HTTP_METHODS.GET],
+      `get${modelNamePlural}: (where: Prisma.${NAME}WhereInput) => Promise<{${modelNamePlural}: ${NAME}[]}>;`
+    )}
+    ${getStringByMethod(
+      params.selection[HTTP_METHODS.GET_DETAILS],
+      `get${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;`
+    )}
+    ${getStringByMethod(
+      params.selection[HTTP_METHODS.POST],
+      `create${NAME}: (data: ${postDataType}) => Promise<{${NAME}: ${NAME}}>;`
+    )}
+    ${getStringByMethod(
+      params.selection[HTTP_METHODS.PUT],
+      `update${NAME}: (
+        data: ${putDataType},
+        where: Prisma.${NAME}WhereUniqueInput
+      ) => Promise<{${NAME}: ${NAME}}>;`
+    )}
+    ${getStringByMethod(
+      params.selection[HTTP_METHODS.DELETE],
+      `delete${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;`
+    )}
   }
 }
 
 export const ${SERVICE_NAME}: FastifyPluginAsync = fp(async (fastify, _opts) => {
-  async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput) {
-    const ${modelNamePlural} = await db.${NAME}.findMany({where});
-    return { ${modelNamePlural} }
-  }
 
-  async function get${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.findUnique({ where });
-    return { ${NAME} }
-  }
+  ${getGetService({
+    model: params.model,
+    selection: params.selection[HTTP_METHODS.GET],
+  })}
+  ${getGetDetailsService({
+    model: params.model,
+    selection: params.selection[HTTP_METHODS.GET_DETAILS],
+  })}
+  ${getPostService({
+    model: params.model,
+    selection: params.selection[HTTP_METHODS.POST],
+    postDataType,
+  })}
+  ${getPutService({
+    model: params.model,
+    selection: params.selection[HTTP_METHODS.PUT],
+    putDataType,
+  })}
+  ${getDeleteService({
+    model: params.model,
+    selection: params.selection[HTTP_METHODS.DELETE],
+  })}
 
-  async function create${NAME}(data: Prisma.${NAME}${POST_UNCHECKED_PREFIX}CreateInput) {
-    const ${NAME} = await db.${NAME}.create({ data });
-    return { ${NAME} }
-  }
-
-  async function update${NAME}(data: Prisma.${NAME}${PUT_UNCHECKED_PREFIX}UpdateInput, where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.update({ data, where });
-    return { ${NAME} }
-  }
-
-  async function delete${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.delete({ where });
-    return { ${NAME} }
-  }
-
-  fastify.decorate("get${modelNamePlural}", get${modelNamePlural})
-  fastify.decorate("get${NAME}", get${NAME})
-  fastify.decorate("create${NAME}", create${NAME})
-  fastify.decorate("update${NAME}", update${NAME})
-  fastify.decorate("delete${NAME}", delete${NAME})
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.GET],
+    `fastify.decorate("get${modelNamePlural}", get${modelNamePlural})`
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.GET_DETAILS],
+    `fastify.decorate("get${NAME}", get${NAME})`
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.POST],
+    `fastify.decorate("create${NAME}", create${NAME})`
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.PUT],
+    `fastify.decorate("update${NAME}", update${NAME})`
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.DELETE],
+    `fastify.decorate("delete${NAME}", delete${NAME})`
+  )}
 })
 `;
 }

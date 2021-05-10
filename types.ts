@@ -2,12 +2,22 @@ import { DMMF } from "@prisma/generator-helper";
 
 export type controllerParams = {
   model: DMMF.Model;
-  selection: selectionType;
+  selection: selectionAnswerType;
+};
+
+export type OptsParams = {
+  model: DMMF.Model;
+  selection?: selectionType[];
+};
+
+export type ServiceParams = {
+  model: DMMF.Model;
+  selection?: selectionType[];
 };
 
 export type serviceParams = {
   model: DMMF.Model;
-  selection: selectionType;
+  selection: selectionAnswerType;
 };
 
 export type routeParams = {
@@ -17,12 +27,10 @@ export type routeParams = {
 
 export type typeParams = {
   model: DMMF.Model;
-  selection: selectionType;
+  selection: selectionAnswerType;
 };
 
 export type getResponseParams = {
-  scalarFields: ScalarField[];
-  enumFields: DMMF.Field[];
   selection: selectionType[HTTP_METHODS.GET];
 };
 
@@ -32,8 +40,7 @@ export type getQueryParams = {
 };
 
 export type getDetailsParamsParams = {
-  idField: ScalarField | undefined;
-  selection: selectionType[HTTP_METHODS.GET_DETAILS];
+  idField: ScalarField;
 };
 
 export type postBodyParams = {
@@ -49,7 +56,7 @@ export type putBodyParams = {
 };
 
 export type putParamsParams = {
-  idField: ScalarField | undefined;
+  idField: ScalarField;
 };
 
 export type deleteParamsParams = {
@@ -71,8 +78,6 @@ export type ScalarField = DMMF.Field & { type: PrismaPrimitive };
 
 export enum HTTP_METHODS {
   GET = "GET",
-  GET_CURSOR_PAGINATION = "GET (with cursor based pagination)",
-  GET_OFFSET_PAGINATION = "GET (with offset based pagination)",
   GET_DETAILS = "GET/:id",
   POST = "POST",
   PUT = "PUT",
@@ -83,8 +88,10 @@ export type templateConfig = {
   outPath: string;
 };
 
-export type selectionType = { [key: string]: DMMF.Field | selectionType };
+export type selectionType =
+  | DMMF.Field
+  | (DMMF.Field & { values: selectionType });
 
 export type selectionAnswerType = {
-  [key in HTTP_METHODS]?: selectionType;
+  [key in HTTP_METHODS]?: selectionType[];
 };

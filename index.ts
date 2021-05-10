@@ -31,7 +31,7 @@ async function getRelationAnwers(
   relationsChain: string[],
   objectFields: DMMF.Field[]
 ) {
-  const selection: selectionType = {};
+  const selections: selectionType[] = [];
   for (const relation of objectFields) {
     const model = models.find((model) => model.name === relation.name)!;
     const relationAnswers: {
@@ -48,31 +48,32 @@ async function getRelationAnwers(
         disabled:
           (field.kind === "scalar" &&
             isDisabledScalarField(field as ScalarField)) ||
-          relationsChain.includes(field.name),
+          relationsChain.includes(field.type),
         value: field,
       })),
     });
 
-    const normalized: { [key: string]: DMMF.Field } = relationAnswers[
-      relation.name
-    ].reduce(
-      (a, v) => ({
-        ...a,
-        [v.name]: v,
-      }),
-      {}
+    const objectFields = relationAnswers[relation.name].filter(
+      (field) => field.kind === "object"
     );
 
-    const answers = await getRelationAnwers(
+    const scalarOrEnumFields = relationAnswers[relation.name].filter(
+      (field) => field.kind === "scalar" || field.kind === "enum"
+    );
+
+    const subAnswers = await getRelationAnwers(
       models,
       [...relationsChain, relation.name],
-      relationAnswers[relation.name].filter((field) => field.kind === "object")
+      objectFields
     );
 
-    selection[relation.name] = { ...normalized, ...answers };
+    selections.push({
+      ...relation,
+      values: [...scalarOrEnumFields, ...subAnswers],
+    });
   }
 
-  return selection;
+  return selections;
 }
 
 async function main() {
@@ -101,8 +102,6 @@ async function main() {
       type: "checkbox",
       choices: [
         HTTP_METHODS.GET,
-        HTTP_METHODS.GET_CURSOR_PAGINATION,
-        HTTP_METHODS.GET_OFFSET_PAGINATION,
         HTTP_METHODS.GET_DETAILS,
         HTTP_METHODS.POST,
         HTTP_METHODS.PUT,
@@ -132,16 +131,12 @@ async function main() {
       })),
     });
 
-    const normalized = methodAnswers[method].reduce(
-      (a, v) => ({
-        ...a,
-        [v.name]: v,
-      }),
-      {}
+    const objectFields = methodAnswers[method].filter(
+      (field) => field.kind === "object"
     );
 
-    let objectFields = methodAnswers[method].filter(
-      (field) => field.kind === "object"
+    const scalarOrEnumFields = methodAnswers[method].filter(
+      (field) => field.kind === "scalar" || field.kind === "enum"
     );
 
     // this is needed to prevent circular relations
@@ -153,7 +148,7 @@ async function main() {
       objectFields
     );
 
-    selection[method] = { ...normalized, ...answers };
+    selection[method] = [...scalarOrEnumFields, ...answers];
   }
 
   // for services and types
@@ -180,7 +175,7 @@ async function main() {
       if (fs.existsSync(path)) {
         const answer: { replace: boolean } = await inquirer.prompt({
           type: "confirm",
-          message: `${path} already exists. Replace?`,
+          message: `${path} already exists. Replace it?`,
           name: "replace",
           default: false,
         });
@@ -214,7 +209,7 @@ async function main() {
     if (fs.existsSync(path)) {
       const answer: { replace: boolean } = await inquirer.prompt({
         type: "confirm",
-        message: `${path} already exists. Replace?`,
+        message: `${path} already exists. Replace it?`,
         name: "replace",
         default: false,
       });

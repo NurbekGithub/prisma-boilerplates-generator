@@ -3,40 +3,44 @@ import {
   deleteParamsParams,
   getDetailsParamsParams,
   getQueryParams,
-  getResponseParams,
-  postBodyParams,
-  putBodyParams,
+  HTTP_METHODS,
+  OptsParams,
   putParamsParams,
   ScalarField,
+  selectionType,
   templateConfig,
   typeParams,
 } from "../../../../types";
-import { getTypeboxModifier, getTypeboxScalar } from "../../../../utils";
+import {
+  getEnumFields,
+  getIdField,
+  getScalarFields,
+  getTypeboxModifier,
+  getTypeboxScalar,
+} from "../../../../utils";
 
-// function getResponse(params: getResponseParams) {
-//   return `Type.Object({
-//     ${params.scalarFields
-//       .map(
-//         (field) =>
-//           `${field.name}: Type.${getTypeboxModifier(
-//             field.isRequired
-//           )}(Type.${getTypeboxScalar(field.type)}())`
-//       )
-//       .join(",\n")},
-//     ${params.enumFields
-//       .map(
-//         (field) =>
-//           `${field.name}: Type.${getTypeboxModifier(
-//             field.isRequired
-//           )}(Type.Enum(${field.type}))`
-//       )
-//       .join(",\n")}
-//   })`;
-// }
-function getResponse(params: getResponseParams) {
-  return `Type.Object({
-    ${Object.keys(params.selection!).map()}
-  })`;
+function getGetOpts({ model, selection }: OptsParams) {
+  if (!selection) return "";
+  const modelNamePlural = pluralize(model.name);
+  const scalarFields = getScalarFields(model.fields);
+  const enumFields = getEnumFields(model.fields);
+  return `export const GetOpts = {
+    schema: {
+      query: ${getQuery({
+        scalarFields,
+        enumFields,
+      })},
+      response: {
+        200: Type.Object({
+          ${modelNamePlural}: Type.Array(
+            ${getResponseObject(selection)}
+          )
+        }),
+      },
+    },
+  };
+  
+  export type GetQueryStatic = Static<typeof GetOpts.schema.query>;`;
 }
 
 function getQuery(params: getQueryParams) {
@@ -46,53 +50,125 @@ function getQuery(params: getQueryParams) {
     ${params.scalarFields
       .map(
         (field) =>
-          `${field.name}: Type.Optional(Type.${getTypeboxScalar(field.type)}())`
+          `${field.name}: Type.Optional(Type.${getTypeboxScalar(
+            field.type
+          )}()),`
       )
-      .join(",\n")},
+      .join("\n")},
     ${params.enumFields
-      .map((field) => `${field.name}: Type.Optional(Type.Enum(${field.type}))`)
-      .join(",\n")}})`;
+      .map(
+        (field) =>
+          `${field.name}: Type.Optional(Type.Enum(PrismaClient.${field.type})),`
+      )
+      .join("\n")}})`;
 }
 
-function getDetailsParams(params: getDetailsParamsParams) {
-  const idField = params.idField!;
+function getResponseObject(selection: selectionType[]): string {
+  const scalarFields = selection.filter(
+    (field) => field.kind === "scalar"
+  ) as ScalarField[];
+  const enumFields = selection.filter((field) => field.kind === "enum");
+  const objectFields = selection.filter((field) => field.kind === "object");
+  return `Type.Object({
+    ${scalarFields
+      .map(
+        (field) =>
+          `${field.name}: Type.${getTypeboxModifier(
+            field.isRequired
+          )}(Type.${getTypeboxScalar(field.type)}()),`
+      )
+      .join("\n")}
+      ${enumFields
+        .map(
+          (field) =>
+            `${field.name}: Type.${getTypeboxModifier(
+              field.isRequired
+            )}(Type.Enum(PrismaClient.${field.type})),`
+        )
+        .join("\n")}
+      ${objectFields
+        .map((field) => `${field.name}: ${getResponseObject(field.values)},`)
+        .join("\n")}
+  })`;
+}
+
+function getGetDetailsOpts({ model, selection }: OptsParams) {
+  const NAME = model.name;
+  const idField = getIdField(model.fields);
+  if (!idField || !selection) return "";
+  return `export const GetDetailsOpts = {
+    schema: {
+      params: ${getDetailsParams({ idField })},
+      response: {
+        200: Type.Object({
+          ${NAME}: ${getResponseObject(selection)}
+        }),
+      },
+    },
+  };
+  
+  export type GetDetailsParamsStatic = Static<typeof GetDetailsOpts.schema.params>;`;
+}
+
+function getPostOpts({ model, selection }: OptsParams) {
+  const NAME = model.name;
+  if (!selection) return "";
+  // TODO rename getResponseObject to less specific or create new function
+  return `export const PostOpts = {
+    schema: {
+      body: ${getResponseObject(selection)},
+      response: {
+        200: Type.Object({
+          ${NAME}: ${getResponseObject(selection)}
+        }),
+      },
+    },
+  };
+  
+  export type PostBodyStatic = Static<typeof PostOpts.schema.body>;`;
+}
+
+function getPutOpts({ model, selection }: OptsParams) {
+  const NAME = model.name;
+  const idField = getIdField(model.fields);
+  if (!idField || !selection) return "";
+  return `export const PutOpts = {
+    schema: {
+      body: ${getResponseObject(selection)},
+      params: ${putParams({ idField })},
+      response: {
+        200: Type.Object({
+          ${NAME}: ${getResponseObject(selection)}
+        }),
+      },
+    },
+  };
+  
+  export type PutBodyStatic = Static<typeof PutOpts.schema.body>;
+  export type PutParamsStatic = Static<typeof PutOpts.schema.params>;`;
+}
+
+function getDeleteOpts({ model, selection }: OptsParams) {
+  const NAME = model.name;
+  const idField = getIdField(model.fields);
+  if (!idField || !selection) return "";
+  return `export const DeleteOpts = {
+    schema: {
+      params: ${deleteParams({ idField })},
+      response: {
+        200: Type.Object({
+          ${NAME}: ${getResponseObject(selection)}
+        }),
+      },
+    },
+  };
+  
+  export type DeleteParamsStatic = Static<typeof DeleteOpts.schema.params>;`;
+}
+
+function getDetailsParams({ idField }: getDetailsParamsParams) {
   return `Type.Object({
     ${idField.name}: Type.${getTypeboxScalar(idField.type)}()
-  })`;
-}
-
-function postBody(params: postBodyParams) {
-  return `Type.Object({
-    ${params.scalarFields
-      .map(
-        (field) =>
-          `${field.name}: Type.${getTypeboxModifier(
-            field.isRequired
-          )}(Type.${getTypeboxScalar(field.type)}())`
-      )
-      .join(",\n")},
-    ${params.enumFields
-      .map(
-        (field) =>
-          `${field.name}: Type.${getTypeboxModifier(
-            field.isRequired
-          )}(Type.Enum(${field.type}))`
-      )
-      .join(",\n")}
-  })`;
-}
-
-function putBody(params: putBodyParams) {
-  return `Type.Object({
-    ${params.scalarFields
-      .map(
-        (field) =>
-          `${field.name}: Type.Optional(Type.${getTypeboxScalar(field.type)}())`
-      )
-      .join(",\n")},
-    ${params.enumFields
-      .map((field) => `${field.name}: Type.Optional(Type.Enum(${field.type}))`)
-      .join(",\n")}
   })`;
 }
 
@@ -111,101 +187,33 @@ function deleteParams(params: deleteParamsParams) {
 }
 
 export default function file(params: typeParams) {
-  const NAME = params.model.name;
-  const modelNamePlural = pluralize(NAME);
-  const scalarFields = params.model.fields.filter(
-    (field) => field.kind === "scalar"
-  ) as ScalarField[];
-  const enumFields = params.model.fields.filter(
-    (field) => field.kind === "enum"
-  );
-  const idField = params.model.fields.find((field) => field.isId) as
-    | ScalarField
-    | undefined;
   return `import { Type, Static } from "@sinclair/typebox";
-${
-  enumFields.length > 0
-    ? `import { ${enumFields
-        .map((field) => field.type)
-        .join(", ")} } from "@prisma/client";`
-    : ""
-}
+  import * as PrismaClient from "@prisma/client";
 
-export const GetOpts = {
-  schema: {
-    query: ${getQuery({
-      scalarFields,
-      enumFields,
-    })},
-    response: {
-      200: Type.Object({
-        ${modelNamePlural}: Type.Array(
-          ${getResponse({
-            enumFields,
-            scalarFields,
-            selection: params.selection.GET,
-          })}
-        )
-      }),
-    },
-  },
-};
+${getGetOpts({
+  model: params.model,
+  selection: params.selection[HTTP_METHODS.GET],
+})}
 
-export type GetQueryStatic = Static<typeof GetOpts.schema.query>;
+${getGetDetailsOpts({
+  model: params.model,
+  selection: params.selection[HTTP_METHODS.GET_DETAILS],
+})}
 
-export const GetDetailsOpts = {
-  schema: {
-    params: ${getDetailsParams({ idField })},
-    response: {
-      200: Type.Object({
-        ${NAME}: ${getResponse({ enumFields, scalarFields })}
-      }),
-    },
-  },
-};
+${getPostOpts({
+  model: params.model,
+  selection: params.selection[HTTP_METHODS.POST],
+})}
 
-export type GetDetailsParamsStatic = Static<typeof GetDetailsOpts.schema.params>;
+${getPutOpts({
+  model: params.model,
+  selection: params.selection[HTTP_METHODS.PUT],
+})}
 
-export const PostOpts = {
-  schema: {
-    body: ${postBody({ enumFields, scalarFields })},
-    response: {
-      200: Type.Object({
-        ${NAME}: ${getResponse({ enumFields, scalarFields })}
-      }),
-    },
-  },
-};
-
-export type PostBodyStatic = Static<typeof PostOpts.schema.body>;
-
-export const PutOpts = {
-  schema: {
-    body: ${putBody({ enumFields, scalarFields })},
-    params: ${putParams({ idField })},
-    response: {
-      200: Type.Object({
-        ${NAME}: ${getResponse({ enumFields, scalarFields })}
-      }),
-    },
-  },
-};
-
-export type PutBodyStatic = Static<typeof PutOpts.schema.body>;
-export type PutParamsStatic = Static<typeof PutOpts.schema.params>;
-
-export const DeleteOpts = {
-  schema: {
-    params: ${deleteParams({ idField })},
-    response: {
-      200: Type.Object({
-        ${NAME}: ${getResponse({ enumFields, scalarFields })}
-      }),
-    },
-  },
-};
-
-export type DeleteParamsStatic = Static<typeof DeleteOpts.schema.params>;
+${getDeleteOpts({
+  model: params.model,
+  selection: params.selection[HTTP_METHODS.DELETE],
+})}
 `;
 }
 
