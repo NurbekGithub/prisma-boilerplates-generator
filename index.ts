@@ -7,7 +7,7 @@ import {
   TEMPLATES_PATH,
 } from "./constants";
 import {
-  controllerParams,
+  fileParams,
   HTTP_METHODS,
   ScalarField,
   selectionAnswerType,
@@ -23,7 +23,7 @@ interface moduleType {
 }
 
 interface routeModuleType extends moduleType {
-  default: (args: controllerParams) => string;
+  default: (args: fileParams) => string;
 }
 
 async function getRelationAnwers(

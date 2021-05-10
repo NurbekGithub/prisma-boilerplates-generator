@@ -1,6 +1,6 @@
 import { DMMF } from "@prisma/generator-helper";
 
-export type controllerParams = {
+export type fileParams = {
   model: DMMF.Model;
   selection: selectionAnswerType;
 };
@@ -13,11 +13,6 @@ export type OptsParams = {
 export type ServiceParams = {
   model: DMMF.Model;
   selection?: selectionType[];
-};
-
-export type serviceParams = {
-  model: DMMF.Model;
-  selection: selectionAnswerType;
 };
 
 export type routeParams = {

@@ -1,92 +1,93 @@
-import { DMMF } from "@prisma/generator-helper";
-import pluralize from "pluralize";
-import changeCase from "change-case";
+import { camelCase as cC, capitalCase as CC } from "change-case";
 import {
-  controllerParams,
+  fileParams,
   HTTP_METHODS,
   routeParams,
   ScalarField,
   templateConfig,
 } from "../../../types";
-import { getStringByMethod } from "../../../utils";
+import { distinctPluralize, getStringByMethod } from "../../../utils";
 
 function getRoute(params: routeParams) {
-  let modelNamePlural = pluralize(params.modelName);
-  if (modelNamePlural === params.modelName) {
-    modelNamePlural += "es";
-  }
+  const camelCase = cC(params.modelName);
+  const CapitalCase = CC(params.modelName);
+  const pluralizedCamelCase = distinctPluralize(camelCase);
+  const pluralizedCapitalCase = distinctPluralize(CapitalCase);
+
   return `fastify.get<{ Querystring: schemaOpts.GetQueryStatic }>("/", schemaOpts.GetOpts, async (req) => {
     const {limit, offset, ...filters} = req.query;
-    const { ${modelNamePlural}, totalCount } = await fastify.get${modelNamePlural}(filters, limit, offset);
+    const { ${pluralizedCamelCase}, totalCount } = await fastify.get${pluralizedCapitalCase}(filters, limit, offset);
     return {
-      ${modelNamePlural},
+      ${pluralizedCamelCase},
       totalCount
     };
   });`;
 }
 
-// TODO: GLOBAL NAME AND PLURAL NAME
-
 function getDetailsRoute(params: routeParams) {
-  const NAME = params.modelName;
+  const camelCase = cC(params.modelName);
+  const CapitalCase = CC(params.modelName);
   const ID = params.idField!.name;
   return `fastify.get<{ Params: schemaOpts.GetDetailsParamsStatic }>("/:${ID}", schemaOpts.GetDetailsOpts, async (req) => {
     const { ${ID} } = req.params;
-    const { ${NAME} } = await fastify.get${NAME}({ ${ID} });
+    const { ${camelCase} } = await fastify.get${CapitalCase}({ ${ID} });
     return {
-      ${NAME}
+      ${camelCase}
     };
   });`;
 }
 
 function postRoute(params: routeParams) {
-  const NAME = params.modelName;
+  const camelCase = cC(params.modelName);
+  const CapitalCase = CC(params.modelName);
   return `fastify.post<{ Body: schemaOpts.PostBodyStatic }>("/", schemaOpts.PostOpts, async (req) => {
     const data = req.body;
-    const { ${NAME} } = await fastify.create${NAME}(data);
+    const { ${camelCase} } = await fastify.create${CapitalCase}(data);
     return {
-      ${NAME}
+      ${camelCase}
     };
   });`;
 }
 
 function putRoute(params: routeParams) {
-  const NAME = params.modelName;
+  const camelCase = cC(params.modelName);
+  const CapitalCase = CC(params.modelName);
   const ID = params.idField!.name;
   return `fastify.put<{ Body: schemaOpts.PutBodyStatic, Params: schemaOpts.PutParamsStatic }>("/:${ID}", schemaOpts.PutOpts, async (req) => {
     const { ${ID} } = req.params;
     const data = req.body;
-    const { ${NAME} } = await fastify.update${NAME}(data, { ${ID} });
+    const { ${camelCase} } = await fastify.update${CapitalCase}(data, { ${ID} });
     return {
-      ${NAME}
+      ${camelCase}
     };
   });`;
 }
 
 function deleteRoute(params: routeParams) {
-  const NAME = params.modelName;
+  const camelCase = cC(params.modelName);
+  const CapitalCase = CC(params.modelName);
   const ID = params.idField!.name;
   return `fastify.delete<{ Params: schemaOpts.DeleteParamsStatic }>("/:${ID}", schemaOpts.DeleteOpts, async (req) => {
     const { ${ID} } = req.params;
-    const { ${NAME} } = await fastify.delete${NAME}({ ${ID} });
+    const { ${camelCase} } = await fastify.delete${CapitalCase}({ ${ID} });
     return {
-      ${NAME}
+      ${camelCase}
     };
   });`;
 }
 
-export default function file(params: controllerParams) {
-  const NAME = params.model.name;
-  const SERVICE_NAME = NAME + "Service";
-  const CONTROLLER_NAME = NAME + "Controller";
+export default function file(params: fileParams) {
+  const camelCase = cC(params.model.name);
+  const SERVICE_NAME = camelCase + "Service";
+  const CONTROLLER_NAME = camelCase + "Controller";
 
   const idField = params.model.fields.find((field) => field.isId) as
     | ScalarField
     | undefined;
 
   return `import { FastifyPluginAsync } from "fastify";
-import {${SERVICE_NAME}} from "./services/${NAME}.service"
-import * as schemaOpts from "./types/${NAME}.types"
+import {${SERVICE_NAME}} from "./services/${camelCase}.service"
+import * as schemaOpts from "./types/${camelCase}.types"
 
 const ${CONTROLLER_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
 
@@ -94,27 +95,27 @@ const ${CONTROLLER_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
 
   ${getStringByMethod(
     params.selection[HTTP_METHODS.GET],
-    getRoute({ modelName: NAME })
+    getRoute({ modelName: params.model.name })
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.GET_DETAILS],
-    getDetailsRoute({ modelName: NAME, idField })
+    getDetailsRoute({ modelName: params.model.name, idField })
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.POST],
-    postRoute({ modelName: NAME })
+    postRoute({ modelName: params.model.name })
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.PUT],
-    putRoute({ modelName: NAME, idField })
+    putRoute({ modelName: params.model.name, idField })
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.DELETE],
-    deleteRoute({ modelName: NAME, idField })
+    deleteRoute({ modelName: params.model.name, idField })
   )}
 };
 
-export const autoPrefix = "/${NAME}";
+export const autoPrefix = "/${camelCase}";
 export default ${CONTROLLER_NAME}; 
 `;
 }

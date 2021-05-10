@@ -1,4 +1,4 @@
-import pluralize from "pluralize";
+import { camelCase as cC } from "change-case";
 import {
   deleteParamsParams,
   getDetailsParamsParams,
@@ -12,18 +12,19 @@ import {
   typeParams,
 } from "../../../../types";
 import {
+  distinctPluralize,
   getEnumFields,
   getIdField,
   getScalarFields,
   getTypeboxScalar,
   wrapArrayField,
-  wrapArrayWithUnionField,
   wrapOptionalField,
 } from "../../../../utils";
 
 function getGetOpts({ model, selection }: OptsParams) {
   if (!selection) return "";
-  const modelNamePlural = pluralize(model.name);
+  const camelCase = cC(model.name);
+  const pluralizedCamelCase = distinctPluralize(camelCase);
   const scalarFields = getScalarFields(model.fields);
   const enumFields = getEnumFields(model.fields);
   return `export const GetOpts = {
@@ -34,7 +35,7 @@ function getGetOpts({ model, selection }: OptsParams) {
       })},
       response: {
         200: Type.Object({
-          ${modelNamePlural}: Type.Array(
+          ${pluralizedCamelCase}: Type.Array(
             ${getResponseObject(selection)}
           ),
           totalCount: Type.Integer()
@@ -109,7 +110,10 @@ function getBodyObject(selection: selectionType[]): string {
   })`;
 }
 
-function getResponseObject(selection: selectionType[]): string {
+function getResponseObject(
+  selection: selectionType[],
+  isNullable = false
+): string {
   const scalarFields = selection.filter(
     (field) => field.kind === "scalar"
   ) as ScalarField[];
@@ -119,24 +123,22 @@ function getResponseObject(selection: selectionType[]): string {
     ${scalarFields
       .map(
         (field) =>
-          `${field.name}: ${wrapOptionalField(
-            field.isRequired,
-            wrapArrayWithUnionField(
-              field.isList,
-              `Type.${getTypeboxScalar(field.type)}(),`
-            )
+          `${field.name}: ${wrapArrayField(
+            field.isList,
+            `Type.${getTypeboxScalar(
+              field.type
+            )}({nullable: ${!field.isRequired}}),`
           )}`
       )
       .join("\n")}
       ${enumFields
         .map(
           (field) =>
-            `${field.name}: ${wrapOptionalField(
-              field.isRequired,
-              wrapArrayWithUnionField(
-                field.isList,
-                `Type.Enum(PrismaClient.${field.type}),`
-              )
+            `${field.name}: ${wrapArrayField(
+              field.isList,
+              `Type.Enum(PrismaClient.${
+                field.type
+              }, {nullable: ${!field.isRequired}}),`
             )}`
         )
         .join("\n")}
@@ -145,26 +147,26 @@ function getResponseObject(selection: selectionType[]): string {
           (field) =>
             `${field.name}: ${wrapOptionalField(
               field.isRequired,
-              wrapArrayWithUnionField(
+              wrapArrayField(
                 field.isList,
-                `${getResponseObject(field.values)},`
+                `${getResponseObject(field.values, !field.isRequired)},`
               )
             )}`
         )
         .join("\n")}
-  })`;
+  }, {nullable: ${isNullable}})`;
 }
 
 function getGetDetailsOpts({ model, selection }: OptsParams) {
-  const NAME = model.name;
   const idField = getIdField(model.fields);
   if (!idField || !selection) return "";
+  const camelCase = cC(model.name);
   return `export const GetDetailsOpts = {
     schema: {
       params: ${getDetailsParams({ idField })},
       response: {
         200: Type.Object({
-          ${NAME}: ${getResponseObject(selection)}
+          ${camelCase}: ${getResponseObject(selection)}
         }),
       },
     },
@@ -174,8 +176,8 @@ function getGetDetailsOpts({ model, selection }: OptsParams) {
 }
 
 function getPostOpts({ model, selection }: OptsParams) {
-  const NAME = model.name;
   if (!selection) return "";
+  const camelCase = cC(model.name);
   // TODO: use relationFromFields to exclude scalar fields from post body
   // that being used with its object version (user, user_id)
   return `export const PostOpts = {
@@ -183,7 +185,7 @@ function getPostOpts({ model, selection }: OptsParams) {
       body: ${getBodyObject(selection)},
       response: {
         200: Type.Object({
-          ${NAME}: ${getResponseObject(selection)}
+          ${camelCase}: ${getResponseObject(selection)}
         }),
       },
     },
@@ -193,9 +195,9 @@ function getPostOpts({ model, selection }: OptsParams) {
 }
 
 function getPutOpts({ model, selection }: OptsParams) {
-  const NAME = model.name;
   const idField = getIdField(model.fields);
   if (!idField || !selection) return "";
+  const camelCase = cC(model.name);
   // TODO: use relationFromFields to exclude scalar fields from post body
   // that being used with its object version (user, user_id)
   return `export const PutOpts = {
@@ -204,7 +206,7 @@ function getPutOpts({ model, selection }: OptsParams) {
       params: ${putParams({ idField })},
       response: {
         200: Type.Object({
-          ${NAME}: ${getResponseObject(selection)}
+          ${camelCase}: ${getResponseObject(selection)}
         }),
       },
     },
@@ -215,15 +217,15 @@ function getPutOpts({ model, selection }: OptsParams) {
 }
 
 function getDeleteOpts({ model, selection }: OptsParams) {
-  const NAME = model.name;
   const idField = getIdField(model.fields);
   if (!idField || !selection) return "";
+  const camelCase = cC(model.name);
   return `export const DeleteOpts = {
     schema: {
       params: ${deleteParams({ idField })},
       response: {
         200: Type.Object({
-          ${NAME}: ${getResponseObject(selection)}
+          ${camelCase}: ${getResponseObject(selection)}
         }),
       },
     },

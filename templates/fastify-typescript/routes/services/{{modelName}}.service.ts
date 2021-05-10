@@ -1,12 +1,13 @@
-import pluralize from "pluralize";
+import { camelCase as cC, capitalCase as CC } from "change-case";
 import {
+  fileParams,
   HTTP_METHODS,
   selectionType,
   ServiceParams,
-  serviceParams,
   templateConfig,
 } from "../../../../types";
 import {
+  distinctPluralize,
   getEnumFields,
   getIdField,
   getObjectFields,
@@ -182,38 +183,42 @@ export function getUpdateData(
     }`;
 }
 
-// TODO: come up with better naming for types (ServiceParams, serviceParams)
+// TODO: where updateMane
+
 function getGetService({ model, selection }: ServiceParams) {
   if (!selection) return "";
-  const NAME = model.name;
-  let modelNamePlural = pluralize(NAME);
+  const camelCase = cC(model.name);
+  const CapitalCase = CC(model.name);
+  const pluralizedCamelCase = distinctPluralize(camelCase);
+  const pluralizedCapitalCase = distinctPluralize(CapitalCase);
 
-  //TODO: make NAME, PLURAL_NAME global
   // TODO: add ordering
-  if (modelNamePlural === NAME) {
-    modelNamePlural += "es";
-  }
-  return `async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput, limit?: number, offset?: number) {
-    const ${modelNamePlural} = await db.${NAME}.findMany({
+  return `async function get${pluralizedCapitalCase}(where: Prisma.${
+    model.name
+  }WhereInput, limit?: number, offset?: number) {
+    const ${pluralizedCamelCase} = await db.${model.name}.findMany({
       where,
       skip: offset,
       take: limit,
       ${getPrismaSelection(selection)}
     });
-    const totalCount = await db.${NAME}.count({ where })
-    return { ${modelNamePlural}, totalCount }
+    const totalCount = await db.${model.name}.count({ where })
+    return { ${pluralizedCamelCase}, totalCount }
   }`;
 }
 
 function getGetDetailsService({ model, selection }: ServiceParams) {
   if (!selection) return "";
-  const NAME = model.name;
+  const camelCase = cC(model.name);
+  const CapitalCase = CC(model.name);
 
-  return `async function get${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.findUnique({ where, ${getPrismaSelection(
-    selection
-  )} });
-    return { ${NAME} }
+  return `async function get${CapitalCase}(where: Prisma.${
+    model.name
+  }WhereUniqueInput) {
+    const ${camelCase} = await db.${
+    model.name
+  }.findUnique({ where, ${getPrismaSelection(selection)} });
+    return { ${camelCase} }
   }`;
 }
 
@@ -223,14 +228,15 @@ function getPostService({
   postDataType,
 }: ServiceParams & { postDataType: string }) {
   if (!selection) return "";
-  const NAME = model.name;
+  const camelCase = cC(model.name);
+  const CapitalCase = CC(model.name);
 
-  return `async function create${NAME}(data: ${postDataType}) {
-    const ${NAME} = await db.${NAME}.create({
+  return `async function create${CapitalCase}(data: ${postDataType}) {
+    const ${camelCase} = await db.${model.name}.create({
       ${getCreateData(selection, true)},
       ${getPrismaSelection(selection)},
     });
-    return { ${NAME} }
+    return { ${camelCase} }
   }`;
 }
 
@@ -240,81 +246,85 @@ function getPutService({
   putDataType,
 }: ServiceParams & { putDataType: string }) {
   if (!selection) return "";
-  const NAME = model.name;
+  const camelCase = cC(model.name);
+  const CapitalCase = CC(model.name);
 
-  return `async function update${NAME}(data: ${putDataType}, where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.update({
+  return `async function update${CapitalCase}(data: ${putDataType}, where: Prisma.${
+    model.name
+  }WhereUniqueInput) {
+    const ${camelCase} = await db.${model.name}.update({
       where,
       ${getUpdateData(selection, true)},
       ${getPrismaSelection(selection)},
     });
-    return { ${NAME} }
+    return { ${camelCase} }
   }`;
 }
 
 function getDeleteService({ model, selection }: ServiceParams) {
   if (!selection) return "";
-  const NAME = model.name;
+  const camelCase = cC(model.name);
+  const CapitalCase = CC(model.name);
 
-  return `async function delete${NAME}(where: Prisma.${NAME}WhereUniqueInput) {
-    const ${NAME} = await db.${NAME}.delete({ where });
-    return { ${NAME} }
+  return `async function delete${CapitalCase}(where: Prisma.${model.name}WhereUniqueInput) {
+    const ${camelCase} = await db.${model.name}.delete({ where });
+    return { ${camelCase} }
   }`;
 }
 
-export default function file(params: serviceParams) {
-  const NAME = params.model.name;
-  const SERVICE_NAME = NAME + "Service";
-  let modelNamePlural = pluralize(NAME);
+export default function file(params: fileParams) {
+  const modelName = params.model.name;
+  const camelCase = cC(modelName);
+  const CapitalCase = CC(modelName);
+  const pluralizedCamelCase = distinctPluralize(camelCase);
+  const pluralizedCapitalCase = distinctPluralize(CapitalCase);
+  const SERVICE_NAME = camelCase + "Service";
 
-  if (modelNamePlural === NAME) {
-    modelNamePlural += "es";
-  }
   // if no nested params selected for POST and PUT methods
   // we will use uncheck version of prisma data type
-  let postDataType = `Prisma.${NAME}UncheckedCreateInput`;
+  let postDataType = `Prisma.${modelName}UncheckedCreateInput`;
   if (hasObjectField(params.selection[HTTP_METHODS.POST])) {
     postDataType = "schemaOpts.PostBodyStatic";
   }
-  let putDataType = `Prisma.${NAME}UncheckedUpdateInput`;
+  let putDataType = `Prisma.${modelName}UncheckedUpdateInput`;
   if (hasObjectField(params.selection[HTTP_METHODS.PUT])) {
     putDataType = "schemaOpts.PutBodyStatic";
   }
 
   return `import fp from 'fastify-plugin'
-import { Prisma, ${NAME} } from "@prisma/client";
+import { Prisma, ${modelName} } from "@prisma/client";
 import { FastifyPluginAsync } from "fastify";
-import * as schemaOpts from "../types/${NAME}.types"
+import * as schemaOpts from "../types/${camelCase}.types"
 import { db } from "../../db";
 
 declare module "fastify" {
   interface FastifyInstance {
     ${getStringByMethod(
       params.selection[HTTP_METHODS.GET],
-      `get${modelNamePlural}: (
-        where: Prisma.${NAME}WhereInput,
+      `get${pluralizedCapitalCase}: (
+        where: Prisma.${modelName}WhereInput,
         limit?: number,
         offset?: number
-      ) => Promise<{${modelNamePlural}: ${NAME}[], totalCount: number}>;`
+      ) => Promise<{${pluralizedCamelCase}: ${modelName}[], totalCount: number}>;`
     )}
     ${getStringByMethod(
       params.selection[HTTP_METHODS.GET_DETAILS],
-      `get${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;`
+      `get${CapitalCase}: (where: Prisma.${modelName}WhereUniqueInput) => Promise<{${camelCase}: ${modelName}}>;`
     )}
     ${getStringByMethod(
       params.selection[HTTP_METHODS.POST],
-      `create${NAME}: (data: ${postDataType}) => Promise<{${NAME}: ${NAME}}>;`
+      `create${CapitalCase}: (data: ${postDataType}) => Promise<{${camelCase}: ${modelName}}>;`
     )}
     ${getStringByMethod(
       params.selection[HTTP_METHODS.PUT],
-      `update${NAME}: (
+      `update${CapitalCase}: (
         data: ${putDataType},
-        where: Prisma.${NAME}WhereUniqueInput
-      ) => Promise<{${NAME}: ${NAME}}>;`
+        where: Prisma.${modelName}WhereUniqueInput
+      ) => Promise<{${camelCase}: ${modelName}}>;`
     )}
     ${getStringByMethod(
       params.selection[HTTP_METHODS.DELETE],
-      `delete${NAME}: (where: Prisma.${NAME}WhereUniqueInput) => Promise<{${NAME}: ${NAME}}>;`
+      `delete${CapitalCase}: (where: Prisma.${modelName}WhereUniqueInput) => Promise<{${camelCase}: ${modelName}}>;`
     )}
   }
 }
@@ -346,23 +356,23 @@ export const ${SERVICE_NAME}: FastifyPluginAsync = fp(async (fastify, _opts) => 
 
   ${getStringByMethod(
     params.selection[HTTP_METHODS.GET],
-    `fastify.decorate("get${modelNamePlural}", get${modelNamePlural})`
+    `fastify.decorate("get${pluralizedCapitalCase}", get${pluralizedCapitalCase})`
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.GET_DETAILS],
-    `fastify.decorate("get${NAME}", get${NAME})`
+    `fastify.decorate("get${CapitalCase}", get${CapitalCase})`
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.POST],
-    `fastify.decorate("create${NAME}", create${NAME})`
+    `fastify.decorate("create${CapitalCase}", create${CapitalCase})`
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.PUT],
-    `fastify.decorate("update${NAME}", update${NAME})`
+    `fastify.decorate("update${CapitalCase}", update${CapitalCase})`
   )}
   ${getStringByMethod(
     params.selection[HTTP_METHODS.DELETE],
-    `fastify.decorate("delete${NAME}", delete${NAME})`
+    `fastify.decorate("delete${CapitalCase}", delete${CapitalCase})`
   )}
 })
 `;

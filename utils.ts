@@ -1,4 +1,5 @@
 import { DMMF } from "@prisma/generator-helper";
+import pluralize from "pluralize";
 import { TOKENS_TO_IGNORE } from "./constants";
 import { PrismaPrimitive, ScalarField, selectionType } from "./types";
 
@@ -30,7 +31,7 @@ export function getTypeboxModifier(isRequired: boolean) {
 
 export function wrapArrayWithUnionField(isList: boolean, children: string) {
   return isList
-    ? `Type.Array(Type.Union([${children} Type.Null()])),`
+    ? `Type.Array(Type.Union([Type.Null(), ${children}])),`
     : children;
 }
 
@@ -40,6 +41,10 @@ export function wrapArrayField(isList: boolean, children: string) {
 
 export function wrapOptionalField(isRequired: boolean, children: string) {
   return !isRequired ? `Type.Optional(${children}),` : children;
+}
+
+export function wrapNullableField(isRequired: boolean, children: string) {
+  return !isRequired ? `Type.Union([Type.Null(), ${children}]),` : children;
 }
 
 export function isDefaultChecked(field: DMMF.Field) {
@@ -91,4 +96,14 @@ export function getStringByMethod(
 ) {
   if (method) return string;
   return "";
+}
+
+export function distinctPluralize(word: string) {
+  let pluralized = pluralize(word);
+
+  if (word === pluralized) {
+    pluralized += "es";
+  }
+
+  return pluralized;
 }
