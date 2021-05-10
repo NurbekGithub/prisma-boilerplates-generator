@@ -8,6 +8,7 @@ import {
   ScalarField,
   templateConfig,
 } from "../../../types";
+import { getStringByMethod } from "../../../utils";
 
 function getRoute(params: routeParams) {
   let modelNamePlural = pluralize(params.modelName);
@@ -15,9 +16,11 @@ function getRoute(params: routeParams) {
     modelNamePlural += "es";
   }
   return `fastify.get<{ Querystring: schemaOpts.GetQueryStatic }>("/", schemaOpts.GetOpts, async (req) => {
-    const { ${modelNamePlural} } = await fastify.get${modelNamePlural}(req.query);
+    const {limit, offset, ...filters} = req.query;
+    const { ${modelNamePlural}, totalCount } = await fastify.get${modelNamePlural}(filters, limit, offset);
     return {
-      ${modelNamePlural}
+      ${modelNamePlural},
+      totalCount
     };
   });`;
 }
@@ -89,32 +92,26 @@ const ${CONTROLLER_NAME}: FastifyPluginAsync = async (fastify, _opts) => {
 
   await fastify.register(${SERVICE_NAME})
 
-  // GET
-  ${params.selection.GET ? getRoute({ modelName: NAME }) : "//Not selected"}
-  // GET/:id
-  ${
-    params.selection[HTTP_METHODS.GET_DETAILS]
-      ? getDetailsRoute({ modelName: NAME, idField })
-      : "//Not selected"
-  }
-  // POST
-  ${
-    params.selection[HTTP_METHODS.POST]
-      ? postRoute({ modelName: NAME })
-      : "//Not selected"
-  }
-  // PUT
-  ${
-    params.selection[HTTP_METHODS.PUT]
-      ? putRoute({ modelName: NAME, idField })
-      : "//Not selected"
-  }
-  // DELETE
-  ${
-    params.selection[HTTP_METHODS.DELETE]
-      ? deleteRoute({ modelName: NAME, idField })
-      : "//Not selected"
-  }
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.GET],
+    getRoute({ modelName: NAME })
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.GET_DETAILS],
+    getDetailsRoute({ modelName: NAME, idField })
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.POST],
+    postRoute({ modelName: NAME })
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.PUT],
+    putRoute({ modelName: NAME, idField })
+  )}
+  ${getStringByMethod(
+    params.selection[HTTP_METHODS.DELETE],
+    deleteRoute({ modelName: NAME, idField })
+  )}
 };
 
 export const autoPrefix = "/${NAME}";

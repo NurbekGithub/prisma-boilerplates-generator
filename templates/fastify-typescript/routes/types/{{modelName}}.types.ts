@@ -15,8 +15,10 @@ import {
   getEnumFields,
   getIdField,
   getScalarFields,
-  getTypeboxModifier,
   getTypeboxScalar,
+  wrapArrayField,
+  wrapArrayWithUnionField,
+  wrapOptionalField,
 } from "../../../../utils";
 
 function getGetOpts({ model, selection }: OptsParams) {
@@ -34,7 +36,8 @@ function getGetOpts({ model, selection }: OptsParams) {
         200: Type.Object({
           ${modelNamePlural}: Type.Array(
             ${getResponseObject(selection)}
-          )
+          ),
+          totalCount: Type.Integer()
         }),
       },
     },
@@ -54,13 +57,56 @@ function getQuery(params: getQueryParams) {
             field.type
           )}()),`
       )
-      .join("\n")},
+      .join("\n")}
     ${params.enumFields
       .map(
         (field) =>
           `${field.name}: Type.Optional(Type.Enum(PrismaClient.${field.type})),`
       )
       .join("\n")}})`;
+}
+
+function getBodyObject(selection: selectionType[]): string {
+  const scalarFields = selection.filter(
+    (field) => field.kind === "scalar"
+  ) as ScalarField[];
+  const enumFields = selection.filter((field) => field.kind === "enum");
+  const objectFields = selection.filter((field) => field.kind === "object");
+  return `Type.Object({
+    ${scalarFields
+      .map(
+        (field) =>
+          `${field.name}: ${wrapOptionalField(
+            field.isRequired,
+            wrapArrayField(
+              field.isList,
+              `Type.${getTypeboxScalar(field.type)}(),`
+            )
+          )}`
+      )
+      .join("\n")}
+      ${enumFields
+        .map(
+          (field) =>
+            `${field.name}: ${wrapOptionalField(
+              field.isRequired,
+              wrapArrayField(
+                field.isList,
+                `Type.Enum(PrismaClient.${field.type}),`
+              )
+            )}`
+        )
+        .join("\n")}
+      ${objectFields
+        .map(
+          (field) =>
+            `${field.name}: ${wrapOptionalField(
+              field.isRequired,
+              wrapArrayField(field.isList, `${getBodyObject(field.values)},`)
+            )}`
+        )
+        .join("\n")}
+  })`;
 }
 
 function getResponseObject(selection: selectionType[]): string {
@@ -73,21 +119,38 @@ function getResponseObject(selection: selectionType[]): string {
     ${scalarFields
       .map(
         (field) =>
-          `${field.name}: Type.${getTypeboxModifier(
-            field.isRequired
-          )}(Type.${getTypeboxScalar(field.type)}()),`
+          `${field.name}: ${wrapOptionalField(
+            field.isRequired,
+            wrapArrayWithUnionField(
+              field.isList,
+              `Type.${getTypeboxScalar(field.type)}(),`
+            )
+          )}`
       )
       .join("\n")}
       ${enumFields
         .map(
           (field) =>
-            `${field.name}: Type.${getTypeboxModifier(
-              field.isRequired
-            )}(Type.Enum(PrismaClient.${field.type})),`
+            `${field.name}: ${wrapOptionalField(
+              field.isRequired,
+              wrapArrayWithUnionField(
+                field.isList,
+                `Type.Enum(PrismaClient.${field.type}),`
+              )
+            )}`
         )
         .join("\n")}
       ${objectFields
-        .map((field) => `${field.name}: ${getResponseObject(field.values)},`)
+        .map(
+          (field) =>
+            `${field.name}: ${wrapOptionalField(
+              field.isRequired,
+              wrapArrayWithUnionField(
+                field.isList,
+                `${getResponseObject(field.values)},`
+              )
+            )}`
+        )
         .join("\n")}
   })`;
 }
@@ -113,10 +176,11 @@ function getGetDetailsOpts({ model, selection }: OptsParams) {
 function getPostOpts({ model, selection }: OptsParams) {
   const NAME = model.name;
   if (!selection) return "";
-  // TODO rename getResponseObject to less specific or create new function
+  // TODO: use relationFromFields to exclude scalar fields from post body
+  // that being used with its object version (user, user_id)
   return `export const PostOpts = {
     schema: {
-      body: ${getResponseObject(selection)},
+      body: ${getBodyObject(selection)},
       response: {
         200: Type.Object({
           ${NAME}: ${getResponseObject(selection)}
@@ -132,9 +196,11 @@ function getPutOpts({ model, selection }: OptsParams) {
   const NAME = model.name;
   const idField = getIdField(model.fields);
   if (!idField || !selection) return "";
+  // TODO: use relationFromFields to exclude scalar fields from post body
+  // that being used with its object version (user, user_id)
   return `export const PutOpts = {
     schema: {
-      body: ${getResponseObject(selection)},
+      body: ${getBodyObject(selection)},
       params: ${putParams({ idField })},
       response: {
         200: Type.Object({

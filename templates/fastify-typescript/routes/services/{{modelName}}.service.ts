@@ -12,6 +12,7 @@ import {
   getObjectFields,
   getScalarFields,
   getScalarFieldsWithoutId,
+  getStringByMethod,
   hasObjectField,
 } from "../../../../utils";
 
@@ -32,7 +33,8 @@ export function getPrismaSelection(fields: selectionType[]): string {
 export function getCreateData(
   fields: selectionType[],
   isFirstLevel: boolean,
-  relationsChain: string[] = []
+  relationsChain: string[] = [],
+  isList: boolean = false
 ): string {
   const scalarOrEnumFields = [
     ...getScalarFieldsWithoutId(fields),
@@ -48,12 +50,24 @@ export function getCreateData(
       ${objectFields
         .map(
           (field) =>
-            `${field.name}: {${getCreateData(field.values, false, [
-              field.name,
-            ])}}`
+            `${field.name}: {${getCreateData(
+              field.values,
+              false,
+              [field.name],
+              field.isList
+            )}}`
         )
         .join(",\n")}
     }`;
+  }
+
+  // prisma does not support nested create many yet
+  // so this will be last stop and should not contain
+  // nested relations further down
+  if (isList) {
+    return `createMany: {
+      data: data.${relationsChain.join(".")}
+    },`;
   }
 
   // if sub relation data has idField
@@ -80,10 +94,12 @@ export function getCreateData(
     ${objectFields
       .map(
         (field) =>
-          `${field.name}: {${getCreateData(field.values, false, [
-            ...relationsChain,
-            field.name,
-          ])}}`
+          `${field.name}: {${getCreateData(
+            field.values,
+            false,
+            [...relationsChain, field.name],
+            field.isList
+          )}}`
       )
       .join(",\n")}
   }`;
@@ -92,7 +108,8 @@ export function getCreateData(
 export function getUpdateData(
   fields: selectionType[],
   isFirstLevel: boolean,
-  relationsChain: string[] = []
+  relationsChain: string[] = [],
+  isList: boolean = false
 ): string {
   const scalarOrEnumFields = [
     ...getScalarFieldsWithoutId(fields),
@@ -108,10 +125,24 @@ export function getUpdateData(
       ${objectFields
         .map(
           (field) =>
-            `${field.name}: ${getUpdateData(field.values, false, [field.name])}`
+            `${field.name}: {${getUpdateData(
+              field.values,
+              false,
+              [field.name],
+              field.isList
+            )}}`
         )
         .join(",\n")}
     }`;
+  }
+
+  // prisma does not support nested update many yet
+  // so this will be last stop and should not contain
+  // nested relations further down
+  if (isList) {
+    return `updateMany: {
+      data: data.${relationsChain.join(".")}
+    },`;
   }
 
   const idField = getIdField(fields);
@@ -140,10 +171,12 @@ export function getUpdateData(
       ${objectFields
         .map(
           (field) =>
-            `${field.name}: ${getUpdateData(field.values, false, [
-              ...relationsChain,
-              field.name,
-            ])}`
+            `${field.name}: {${getUpdateData(
+              field.values,
+              false,
+              [...relationsChain, field.name],
+              field.isList
+            )}}`
         )
         .join(",\n")}
     }`;
@@ -156,14 +189,19 @@ function getGetService({ model, selection }: ServiceParams) {
   let modelNamePlural = pluralize(NAME);
 
   //TODO: make NAME, PLURAL_NAME global
+  // TODO: add ordering
   if (modelNamePlural === NAME) {
     modelNamePlural += "es";
   }
-  return `async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput) {
-    const ${modelNamePlural} = await db.${NAME}.findMany({where, ${getPrismaSelection(
-    selection
-  )}});
-    return { ${modelNamePlural} }
+  return `async function get${modelNamePlural}(where: Prisma.${NAME}WhereInput, limit?: number, offset?: number) {
+    const ${modelNamePlural} = await db.${NAME}.findMany({
+      where,
+      skip: offset,
+      take: limit,
+      ${getPrismaSelection(selection)}
+    });
+    const totalCount = await db.${NAME}.count({ where })
+    return { ${modelNamePlural}, totalCount }
   }`;
 }
 
@@ -224,14 +262,6 @@ function getDeleteService({ model, selection }: ServiceParams) {
   }`;
 }
 
-function getStringByMethod(
-  method: selectionType[] | undefined,
-  string: string
-) {
-  if (method) return string;
-  return "";
-}
-
 export default function file(params: serviceParams) {
   const NAME = params.model.name;
   const SERVICE_NAME = NAME + "Service";
@@ -248,7 +278,7 @@ export default function file(params: serviceParams) {
   }
   let putDataType = `Prisma.${NAME}UncheckedUpdateInput`;
   if (hasObjectField(params.selection[HTTP_METHODS.PUT])) {
-    postDataType = "schemaOpts.PutBodyStatic";
+    putDataType = "schemaOpts.PutBodyStatic";
   }
 
   return `import fp from 'fastify-plugin'
@@ -261,7 +291,11 @@ declare module "fastify" {
   interface FastifyInstance {
     ${getStringByMethod(
       params.selection[HTTP_METHODS.GET],
-      `get${modelNamePlural}: (where: Prisma.${NAME}WhereInput) => Promise<{${modelNamePlural}: ${NAME}[]}>;`
+      `get${modelNamePlural}: (
+        where: Prisma.${NAME}WhereInput,
+        limit?: number,
+        offset?: number
+      ) => Promise<{${modelNamePlural}: ${NAME}[], totalCount: number}>;`
     )}
     ${getStringByMethod(
       params.selection[HTTP_METHODS.GET_DETAILS],

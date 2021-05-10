@@ -28,6 +28,20 @@ export function getTypeboxModifier(isRequired: boolean) {
   return isRequired ? "Readonly" : "Optional";
 }
 
+export function wrapArrayWithUnionField(isList: boolean, children: string) {
+  return isList
+    ? `Type.Array(Type.Union([${children} Type.Null()])),`
+    : children;
+}
+
+export function wrapArrayField(isList: boolean, children: string) {
+  return isList ? `Type.Array(${children}),` : children;
+}
+
+export function wrapOptionalField(isRequired: boolean, children: string) {
+  return !isRequired ? `Type.Optional(${children}),` : children;
+}
+
 export function isDefaultChecked(field: DMMF.Field) {
   if (TOKENS_TO_IGNORE.includes(field.name)) return false;
 
@@ -69,4 +83,12 @@ export function hasObjectField(fields: selectionType[] | undefined) {
   return Boolean(
     fields && Object.values(fields).some((val) => val.kind === "object")
   );
+}
+
+export function getStringByMethod(
+  method: selectionType[] | undefined,
+  string: string
+) {
+  if (method) return string;
+  return "";
 }
