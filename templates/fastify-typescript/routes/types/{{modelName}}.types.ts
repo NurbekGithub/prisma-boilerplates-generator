@@ -5,6 +5,7 @@ import {
   getQueryParams,
   HTTP_METHODS,
   OptsParams,
+  PrismaPrimitive,
   putParamsParams,
   ScalarField,
   selectionType,
@@ -16,10 +17,37 @@ import {
   getEnumFields,
   getIdField,
   getScalarFields,
-  getTypeboxScalar,
-  wrapArrayField,
-  wrapOptionalField,
 } from "../../../../utils";
+
+function getTypeboxScalar(fieldType: PrismaPrimitive): string {
+  switch (fieldType) {
+    case "DateTime":
+    case "String":
+      return "String";
+    case "BigInt":
+    case "Int":
+      return "Integer";
+    case "Float":
+      return "Number";
+    case "Json":
+      return "Unkown";
+    case "Boolean":
+      return "Boolean";
+    case "Bytes":
+      return "Unknown";
+    default:
+      console.error(`Not recognized prisma primitive ${fieldType}`);
+      return "Unknown";
+  }
+}
+
+function wrapOptionalField(isRequired: boolean, children: string) {
+  return !isRequired ? `Type.Optional(${children}),` : children;
+}
+
+function wrapArrayField(isList: boolean, children: string) {
+  return isList ? `Type.Array(${children}),` : children;
+}
 
 function getGetOpts({ model, selection }: OptsParams) {
   if (!selection) return "";
